@@ -1,0 +1,31 @@
+src/index.ts
+  fd5a22e95eb2cd3d 134-142
+API.md
+  fd5a22e95eb2cd3d 912-1007
+README.md
+  fd5a22e95eb2cd3d 289-294
+src/transplant.ts
+  fd5a22e95eb2cd3d 1-445
+tests/transplant.test.ts
+  fd5a22e95eb2cd3d 1-401
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4e4355779df902cd5f629c469d1799cf16a45db2",
+  "prompts": {
+    "fd5a22e95eb2cd3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad58ddf2-6885-4ace-b187-941a2635fd09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 957,
+      "total_deletions": 0,
+      "accepted_lines": 957,
+      "overriden_lines": 0
+    }
+  }
+}
