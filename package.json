@@ -1,0 +1,30 @@
+{
+  "name": "@ai2070/memex",
+  "version": "0.1.0",
+  "description": "MemEX memory layer — graph of memories and edges over an append-only event log",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prettier": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prettier:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "uuidv7": "^1.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.2",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

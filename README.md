@@ -1,0 +1,382 @@
+# @ai2070/memex
+
+Multi-session continuity for AI systems.
+
+MemEX stores beliefs, evidence, conflicts, and updates -- not just retrieved text. It gives agents a continuous belief state across sessions instead of fragmented chat logs.
+
+## The Problem
+
+Every chat session starts from scratch. Memory systems try to fix this by appending text and summarizing when it gets long. But that loses:
+
+- **Why** something is believed (provenance)
+- **How much** to trust it (authority, conviction)
+- **What conflicts** with it (contradictions)
+- **Whether** it's still relevant (decay)
+- **Where** it came from (source attribution)
+
+The result: agents that can retrieve old text but can't reason about what they know.
+
+## What MemEX Does
+
+MemEX is a typed, scored, provenance-tracked graph. Each memory item carries:
+
+- A **kind** -- what it is (observation, assertion, hypothesis, derivation, simulation, policy, trait)
+- A **source_kind** -- how it got here (user-stated, observed, inferred, imported)
+- Three **scores** -- authority (trust), conviction (author confidence), importance (attention priority)
+- **Parents** -- what items it was derived from, forming provenance chains
+- **Edges** -- typed relationships to other items (supports, contradicts, supersedes, alias)
+
+This means the system can:
+
+- Carry forward beliefs across sessions, not just text
+- Track what was observed vs inferred vs assumed
+- Surface contradictions instead of silently overwriting
+- Explain *why* it believes something (provenance tree)
+- Decay stale context while preserving stable knowledge
+- Recognize that two observations refer to the same entity
+
+## Install
+
+```bash
+npm install @ai2070/memex
+```
+
+## Quick Start
+
+```ts
+import {
+  createGraphState,
+  createMemoryItem,
+  applyCommand,
+  getItems,
+  getScoredItems,
+  smartRetrieve,
+} from "@ai2070/memex";
+
+// create an empty graph
+let state = createGraphState();
+
+// add an observation
+const obs = createMemoryItem({
+  scope: "user:laz/general",
+  kind: "observation",
+  content: { key: "login_count", value: 42 },
+  author: "agent:monitor",
+  source_kind: "observed",
+  authority: 0.9,
+  importance: 0.7,
+});
+
+const result = applyCommand(state, { type: "memory.create", item: obs });
+state = result.state;
+
+// add a hypothesis derived from the observation
+const hyp = createMemoryItem({
+  scope: "user:laz/general",
+  kind: "hypothesis",
+  content: { key: "is_power_user", value: true },
+  author: "agent:reasoner",
+  source_kind: "agent_inferred",
+  parents: [obs.id],
+  authority: 0.4,
+  conviction: 0.7,
+  importance: 0.8,
+});
+
+state = applyCommand(state, { type: "memory.create", item: hyp }).state;
+
+// query with filters
+const recent = getItems(state, {
+  or: [{ kind: "observation" }, { kind: "assertion" }],
+  range: { authority: { min: 0.5 } },
+  created: { after: Date.now() - 86400000 },
+});
+
+// scored retrieval with time decay
+const ranked = getScoredItems(
+  state,
+  {
+    authority: 0.5,
+    conviction: 0.3,
+    importance: 0.2,
+    decay: { rate: 0.1, interval: "day", type: "exponential" },
+  },
+  { pre: { scope: "user:laz/general" }, limit: 10 },
+);
+
+// smart retrieval: decay + contradiction surfacing + diversity + budget
+const context = smartRetrieve(state, {
+  budget: 4096,
+  costFn: (item) => JSON.stringify(item.content).length,
+  weights: {
+    authority: 0.5,
+    importance: 0.5,
+    decay: { rate: 0.1, interval: "day", type: "exponential" },
+  },
+  filter: { scope: "user:laz/general" },
+  contradictions: "surface",
+  diversity: { author_penalty: 0.3 },
+});
+```
+
+## Core Concepts
+
+### Memory Items
+
+Not everything is a "fact." A `MemoryItem` can be an observation, an assertion, an assumption, a hypothesis, a derivation, a simulation, a policy, or a trait. The `kind` field says what it *is*; the `source_kind` field says how it *got here*.
+
+### Three Scores
+
+| Score | Question | Range |
+|-------|----------|-------|
+| `authority` | How much should the system trust this? | 0..1 |
+| `conviction` | How sure was the author? | 0..1 |
+| `importance` | How much attention does this need right now? (salience) | 0..1 |
+
+These are orthogonal. A hypothesis can be high-importance (matters a lot) but low-authority (not yet verified).
+
+### Time Decay
+
+Scores decay over time at query time -- the stored values are not mutated. Configure decay per query:
+
+```ts
+{ rate: 0.1, interval: "day", type: "exponential" }
+```
+
+Three types: **exponential** (smooth curve, never zero), **linear** (straight to zero), **step** (drops at interval boundaries). You can also filter out items that have decayed below a threshold.
+
+### Provenance
+
+Items can declare **parents** -- the items they were derived or inferred from. This creates provenance chains that let the system explain *why* it believes something:
+
+```ts
+getSupportSet(state, claimId)
+// -> [claim, parent1, parent2, grandparent1] -- everything that justifies this claim
+```
+
+If a parent is retracted, `getStaleItems` finds orphaned children. `cascadeRetract` removes the entire dependency chain.
+
+### Contradictions
+
+When two items conflict, they can be linked with a `CONTRADICTS` edge. At retrieval time:
+
+- `contradictions: "filter"` -- keep the higher-scoring side (clean context)
+- `contradictions: "surface"` -- keep both, flagged with `contradicted_by` (agent reasoning)
+
+Contradictions can be resolved: `resolveContradiction` creates a `SUPERSEDES` edge and lowers the loser's authority.
+
+### Identity
+
+Two observations of the same entity can be aliased: `markAlias` creates bidirectional `ALIAS` edges. `getAliasGroup` returns the full identity group via transitive closure.
+
+### Edges
+
+Typed relationships between items:
+
+| Edge | Meaning |
+|------|---------|
+| `DERIVED_FROM` | Relationship discovered after creation |
+| `CONTRADICTS` | Two items assert conflicting things |
+| `SUPPORTS` | Evidence for another item |
+| `ABOUT` | References another item |
+| `SUPERSEDES` | Replaces another item (conflict resolution) |
+| `ALIAS` | Same entity, different observations |
+
+### Events
+
+Three categories, all under `namespace: "memory"`:
+
+- **Commands** (imperative): `memory.create`, `memory.update`, `memory.retract`, `edge.create`, `edge.update`, `edge.retract`
+- **Lifecycle** (past tense): `memory.created`, `memory.updated`, `memory.retracted`, `edge.created`, `edge.updated`, `edge.retracted`
+- **State**: `state.memory`, `state.edge`
+
+Commands go in, lifecycle events come out of the reducer, state events are full snapshots for downstream consumers.
+
+### Immutability
+
+`applyCommand` never mutates input state. It returns a new `GraphState` and an array of lifecycle events. History is in the append-only event log; `GraphState` is always the latest snapshot.
+
+## Features
+
+- Full query algebra: `and`, `or`, `not`, `range`, `ids`, `scope_prefix`, `parents` (includes/count), `meta` (dot-path), `meta_has`, `created` (time range), `decay` (freshness filter)
+- Multi-sort with tiebreakers (authority, conviction, importance, recency)
+- Configurable time decay: exponential, linear, or step -- applied at query time, not stored
+- Scored retrieval with pre/post filters, min_score threshold, and decay
+- Smart retrieval: contradiction-aware packing + diversity penalties + budget limits
+- Budget-aware retrieval (greedy knapsack by score/cost)
+- Provenance trees and minimal support sets (`getSupportTree`, `getSupportSet`)
+- Temporal sort and time-based importance decay
+- Bulk transforms with conditional update/retract (`applyMany`)
+- Provenance chains (`parents`, `getParents`, `getChildren`)
+- Conflict detection and resolution (`CONTRADICTS` / `SUPERSEDES`)
+- Staleness detection and cascade retraction
+- Identity resolution (transitive `ALIAS` groups)
+- Serialization (`toJSON` / `fromJSON` / `stringify` / `parse`)
+- Graph stats (counts by kind, author, scope, edge kind)
+- Event envelope wrapping for bus integration
+- Command log replay for state reconstruction
+
+## Where MemEX Fits
+
+MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Agent / App                     │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │  Chat     │  │ Working  │  │   Cognition   │  │
+│  │  Window   │  │ Memory   │  │   Layer       │  │
+│  │ (sliding) │  │(scratch) │  │  (thinking)   │  │
+│  └────┬─────┘  └────┬─────┘  └──────┬────────┘  │
+│       │              │               │            │
+│       └──────────────┼───────────────┘            │
+│                      │                            │
+│              ┌───────▼────────┐                   │
+│              │     MemEX      │                   │
+│              │  (this library) │                   │
+│              └───────┬────────┘                   │
+│                      │                            │
+│         ┌────────────┼────────────┐               │
+│         │            │            │               │
+│   ┌─────▼─────┐ ┌───▼───┐ ┌─────▼─────┐         │
+│   │  Vector   │ │ Text  │ │ Event     │         │
+│   │  Search   │ │ Search│ │ Store     │         │
+│   └───────────┘ └───────┘ └───────────┘         │
+└─────────────────────────────────────────────────┘
+```
+
+### How the pieces connect
+
+**Chat window (sliding context)** -- the current conversation. As messages flow, the agent extracts observations, assertions, and preferences and writes them to MemEX. The chat window is ephemeral; MemEX is where things persist.
+
+**Working memory (scratchpad)** -- short-lived, high-importance items the agent is actively reasoning about. These live in MemEX with `kind: "hypothesis"` or `kind: "assumption"` and high `importance`. After processing, their importance decays and they settle into long-term memory.
+
+**Vector / text search** -- MemEX stores structured items, not embeddings. Search tools subscribe to MemEX lifecycle events and maintain their own indexes. Search indexes are derived from MemEX, not the other way around.
+
+**Cognition layer** -- uses `getScoredItems` and `smartRetrieve` to build its thinking queue. Writes back inferred items, resolved contradictions, and updated scores. The agent prioritizes thinking using authority, conviction, and importance.
+
+**Event store** -- the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
+
+MemEX is the system of record. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
+
+### What changes in agent behavior
+
+Without MemEX, an agent:
+- Forgets between sessions, or retrieves flat text with no trust signal
+- Can't tell if something was observed, inferred, or assumed
+- Silently overwrites old beliefs with new ones
+- Can't explain why it believes something
+- Treats everything as equally important
+
+With MemEX, an agent:
+- Carries forward a structured belief state across sessions
+- Knows the difference between an observation and a hypothesis
+- Surfaces contradictions instead of hiding them
+- Can trace any belief back to its evidence chain
+- Prioritizes what to think about based on importance and uncertainty
+- Lets stale context fade while stable knowledge persists
+
+## Dynamic Resolution
+
+MemEX supports different levels of detail at every stage of the memory lifecycle:
+
+| Stage | Low resolution | High resolution |
+|-------|---------------|----------------|
+| **Retrieval** | High-authority items only, no inferred, fast | Include hypotheses, simulations, full provenance chains |
+| **Thinking** | Direct facts + deterministic derivations | Multi-hop reasoning, contradiction surfacing, support tree traversal |
+| **Insertion** | Store summaries, mark details as low-importance | Store atomic events with full `DERIVED_FROM` chains |
+
+Resolution is controlled through the same primitives -- filters, score weights, and decay:
+
+```ts
+// low resolution: only trusted, recent items
+getItems(state, {
+  range: { authority: { min: 0.7 } },
+  not: { or: [{ kind: "hypothesis" }, { kind: "simulation" }] },
+  decay: { config: { rate: 0.3, interval: "day", type: "exponential" }, min: 0.5 },
+});
+
+// high resolution: everything, scored and ranked
+smartRetrieve(state, {
+  budget: 8192,
+  costFn: (item) => JSON.stringify(item.content).length,
+  weights: { authority: 0.3, conviction: 0.3, importance: 0.4 },
+  contradictions: "surface",
+});
+```
+
+The agent decides resolution based on the task. A routine action uses low resolution. A decision with consequences uses high resolution. The same graph serves both -- no separate "fast" and "deep" memory stores.
+
+### Thinking Budget from Scores
+
+The three scores can drive the thinking budget itself. Items that are important but uncertain deserve more processing. Items that have been processed should have their importance reduced.
+
+```text
+thinking_priority = importance * (1 - authority)
+```
+
+An item with `importance: 0.9` and `authority: 0.3` gets priority `0.63` -- high attention, uncertain, worth reasoning about. An item with `importance: 0.9` and `authority: 0.95` gets priority `0.045` -- important but already trusted, just use it.
+
+After the agent processes an item, reduce its importance:
+
+```ts
+applyCommand(state, {
+  type: "memory.update",
+  item_id: processedItem.id,
+  partial: { importance: processedItem.importance * 0.3 },
+  author: "system:thinker",
+  reason: "processed",
+});
+```
+
+This creates a natural attention cycle: new items arrive with high importance, get processed, importance drops, and they fade into long-term memory unless re-activated. Items that are never processed accumulate and eventually surface through importance-weighted queries.
+
+The cognition layer above can use `getScoredItems` with importance-heavy weights to build its thinking queue, and `decayImportance` to age out items that were never worth processing.
+
+## Choosing Parameters
+
+The library provides knobs. Here's how to think about turning them.
+
+### Decay
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Chat context, ephemeral state | Fast decay: `{ rate: 0.3, interval: "hour", type: "linear" }` |
+| Project knowledge, working memory | Moderate decay: `{ rate: 0.1, interval: "day", type: "exponential" }` |
+| Policies, traits, identity | No decay — these don't become less true over time |
+| Mixed graph | Use the `decay` filter to exclude stale items, but don't decay items with `kind: "policy"` or `kind: "trait"` — filter them in separately with `or` |
+
+### Diversity penalties
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Exploration ("what do we know?") | High `author_penalty` (0.3-0.5) — spread across sources |
+| Verification ("is this true?") | Low or zero `author_penalty` — you *want* correlated evidence |
+| Summarization | Moderate `parent_penalty` (0.2-0.3) — avoid redundant derivations |
+| Debugging / audit | Zero penalties — show everything |
+
+### Score weights
+
+| Scenario | Weights |
+|----------|---------|
+| High-trust retrieval | `{ authority: 0.8, importance: 0.2 }` |
+| Attention-driven (what needs processing?) | `{ importance: 0.8, authority: 0.2 }` |
+| Agent self-evaluation | `{ conviction: 0.5, authority: 0.5 }` |
+| Balanced | `{ authority: 0.4, conviction: 0.3, importance: 0.3 }` |
+
+### Contradiction handling
+
+| Scenario | Mode |
+|----------|------|
+| User-facing context (clean, no confusion) | `contradictions: "filter"` |
+| Agent reasoning (needs to see disagreement) | `contradictions: "surface"` |
+| Audit / debugging | Neither — use `getContradictions()` directly |
+
+These are starting points, not prescriptions. Calibrate based on your use case.
+
+See [API.md](./API.md) for the full API reference.
+
+## License
+
+Apache 2.0 -- see [LICENSE](./LICENSE).
