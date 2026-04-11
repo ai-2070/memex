@@ -219,6 +219,43 @@ const task = createTask({ intent_id: intent.id, input_memory_ids: [obs.id], ... 
 createMemoryItem({ ..., meta: { creation_intent_id: intent.id, creation_task_id: task.id } });
 ```
 
+## The Loop
+
+The three graphs form a continuous cycle:
+
+```
+    ┌─────────────────────────────────────────┐
+    │                                         │
+    ▼                                         │
+ Memory ──────► Intent ──────► Task ──────────┘
+ (belief)       (direction)    (execution)
+    │               │              │
+    │  something    │  spawns      │  produces
+    │  important    │  actionable  │  new memory
+    │  or uncertain │  steps       │  (results,
+    │  appears      │              │   failures,
+    │               │              │   observations)
+    └───────────────┘              │
+         updates belief            │
+         state with new ◄──────────┘
+         evidence
+```
+
+1. **Memory produces intents** — an important or uncertain item surfaces, triggering a goal
+2. **Intents spawn tasks** — the goal breaks into actionable steps
+3. **Tasks produce new memory** — results, observations, and failures write back as memory items
+4. **Memory updates belief state** — new evidence resolves contradictions, reinforces or decays existing beliefs
+
+Most AI systems mix these together: goals hidden in prompts, tasks implicit in code, memory as text blobs. MemEX separates them:
+
+| Layer | Responsibility |
+|-------|---------------|
+| Memory | What is believed |
+| Intent | What is wanted |
+| Task | What is done |
+
+Each layer has its own types, commands, reducer, and query — but they reference each other by ID and share the same event envelope pattern. The separation is what makes the loop auditable: you can trace any belief back to the task that produced it, the intent that motivated it, and the evidence it was based on.
+
 ## Features
 
 **Memory graph:**
