@@ -196,8 +196,32 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 
 `applyCommand` never mutates input state. It returns a new `GraphState` and an array of lifecycle events. History is in the append-only event log; `GraphState` is always the latest snapshot.
 
+## Three Graphs
+
+MemEX contains three logical graphs in one package. Use what you need:
+
+| Graph | Purpose | Core type | Namespace |
+|-------|---------|-----------|-----------|
+| **Memory** | Epistemic state -- beliefs, evidence, contradictions | `MemoryItem` | `"memory"` |
+| **Intent** | Goals and objectives | `Intent` | `"intent"` |
+| **Task** | Units of work tied to intents | `Task` | `"task"` |
+
+All three follow the same pattern: commands → reducer → lifecycle events. They cross-reference by ID:
+
+```ts
+// intent links to memory items that motivated it
+const intent = createIntent({ label: "find_kati", root_memory_ids: [obs.id], ... });
+
+// task links to its parent intent and memory items it consumes/produces
+const task = createTask({ intent_id: intent.id, input_memory_ids: [obs.id], ... });
+
+// after task completes, memory items link back
+createMemoryItem({ ..., meta: { creation_intent_id: intent.id, creation_task_id: task.id } });
+```
+
 ## Features
 
+**Memory graph:**
 - Full query algebra: `and`, `or`, `not`, `range`, `ids`, `scope_prefix`, `parents` (includes/count), `meta` (dot-path), `meta_has`, `created` (time range), `decay` (freshness filter)
 - Multi-sort with tiebreakers (authority, conviction, importance, recency)
 - Configurable time decay: exponential, linear, or step -- applied at query time, not stored
@@ -207,7 +231,6 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 - Provenance trees and minimal support sets (`getSupportTree`, `getSupportSet`)
 - Temporal sort and time-based importance decay
 - Bulk transforms with conditional update/retract (`applyMany`)
-- Provenance chains (`parents`, `getParents`, `getChildren`)
 - Conflict detection and resolution (`CONTRADICTS` / `SUPERSEDES`)
 - Staleness detection and cascade retraction
 - Identity resolution (transitive `ALIAS` groups)
@@ -215,6 +238,16 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 - Graph stats (counts by kind, author, scope, edge kind)
 - Event envelope wrapping for bus integration
 - Command log replay for state reconstruction
+
+**Intent graph:**
+- Status machine: active ↔ paused → completed / cancelled
+- Query by owner, status, priority, linked memory items
+- Invalid transitions throw typed errors
+
+**Task graph:**
+- Status machine: pending → running → completed / failed, with retry support (failed → running)
+- Links to parent intent, input/output memory items, agent assignment
+- Query by intent, action, status, agent, linked memory items
 
 ## Where MemEX Fits
 

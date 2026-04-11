@@ -743,3 +743,169 @@ const stats = getStats(state);
 // stats.edges.active         -> 45
 // stats.edges.by_kind        -> { SUPPORTS: 20, CONTRADICTS: 5, ... }
 ```
+
+---
+
+## Intent Graph
+
+Intents represent goals or objectives. They link to memory items via `root_memory_ids` and are the parent of tasks.
+
+### Types
+
+```ts
+type IntentStatus = "active" | "paused" | "completed" | "cancelled";
+
+interface Intent {
+  id: string;
+  label: string;
+  description?: string;
+  priority: number;              // 0..1
+  owner: string;                 // "user:laz", "agent:reasoner"
+  status: IntentStatus;
+  context?: Record<string, unknown>;
+  root_memory_ids?: string[];    // anchors into the memory graph
+  meta?: Record<string, unknown>;
+}
+
+interface IntentState {
+  intents: Map<string, Intent>;
+}
+```
+
+### Factory & State
+
+```ts
+const state = createIntentState();
+const intent = createIntent({ label: "find_kati", priority: 0.9, owner: "user:laz" });
+// -> id generated, status defaults to "active"
+```
+
+### Commands & Reducer
+
+```ts
+const { state, events } = applyIntentCommand(state, { type: "intent.create", intent });
+```
+
+| Command | Valid from | Target status | Event |
+|---------|-----------|---------------|-------|
+| `intent.create` | — | — | `intent.created` |
+| `intent.update` | any | — | `intent.updated` |
+| `intent.pause` | active | paused | `intent.paused` |
+| `intent.resume` | paused | active | `intent.resumed` |
+| `intent.complete` | active, paused | completed | `intent.completed` |
+| `intent.cancel` | active, paused | cancelled | `intent.cancelled` |
+
+Invalid transitions throw `InvalidIntentTransitionError`.
+
+All lifecycle events have `namespace: "intent"`.
+
+### Query
+
+```ts
+interface IntentFilter {
+  owner?: string;
+  status?: IntentStatus;
+  statuses?: IntentStatus[];
+  min_priority?: number;
+  has_memory_id?: string;        // intent references this memory item
+}
+
+getIntents(state, { owner: "user:laz", statuses: ["active", "paused"] });
+getIntentById(state, "i1");
+```
+
+---
+
+## Task Graph
+
+Tasks are units of work tied to an intent. They track execution status, agent assignment, retry attempts, and link to memory items consumed and produced.
+
+### Types
+
+```ts
+type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+interface Task {
+  id: string;
+  intent_id: string;             // parent intent
+  action: string;                // "search_linkedin", "summarize_case"
+  label?: string;
+  status: TaskStatus;
+  priority: number;              // 0..1
+  context?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
+  input_memory_ids?: string[];   // memory items consumed
+  output_memory_ids?: string[];  // memory items produced
+  agent_id?: string;
+  attempt?: number;              // incremented on retry
+  meta?: Record<string, unknown>;
+}
+
+interface TaskState {
+  tasks: Map<string, Task>;
+}
+```
+
+### Factory & State
+
+```ts
+const state = createTaskState();
+const task = createTask({ intent_id: "i1", action: "search_linkedin", priority: 0.8 });
+// -> id generated, status defaults to "pending", attempt defaults to 0
+```
+
+### Commands & Reducer
+
+```ts
+const { state, events } = applyTaskCommand(state, { type: "task.create", task });
+```
+
+| Command | Valid from | Target status | Event |
+|---------|-----------|---------------|-------|
+| `task.create` | — | — | `task.created` |
+| `task.update` | any | — | `task.updated` |
+| `task.start` | pending, failed | running | `task.started` |
+| `task.complete` | running | completed | `task.completed` |
+| `task.fail` | running | failed | `task.failed` |
+| `task.cancel` | pending, running, failed | cancelled | `task.cancelled` |
+
+`task.start` increments `attempt` and optionally sets `agent_id`. `task.fail` → `task.start` is a retry. Invalid transitions throw `InvalidTaskTransitionError`.
+
+All lifecycle events have `namespace: "task"`.
+
+### Query
+
+```ts
+interface TaskFilter {
+  intent_id?: string;
+  action?: string;
+  status?: TaskStatus;
+  statuses?: TaskStatus[];
+  agent_id?: string;
+  min_priority?: number;
+  has_input_memory_id?: string;
+  has_output_memory_id?: string;
+}
+
+getTasks(state, { intent_id: "i1", statuses: ["pending", "running"] });
+getTaskById(state, "t1");
+getTasksByIntent(state, "i1");
+```
+
+---
+
+## Cross-Graph Linking
+
+The three graphs (memory, intent, task) reference each other by ID:
+
+| From | To | Field |
+|------|----|-------|
+| Intent | Memory | `Intent.root_memory_ids` |
+| Task | Intent | `Task.intent_id` |
+| Task | Memory (input) | `Task.input_memory_ids` |
+| Task | Memory (output) | `Task.output_memory_ids` |
+| Memory | Intent | `MemoryItem.meta.creation_intent_id` |
+| Memory | Task | `MemoryItem.meta.creation_task_id` |
+
+No unified query across graphs — each graph has its own getters. The app layer composes them.

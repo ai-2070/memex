@@ -90,3 +90,44 @@ export { toJSON, fromJSON, stringify, parse } from "./serialization.js";
 export type { SerializedGraphState } from "./serialization.js";
 export { getStats } from "./stats.js";
 export type { GraphStats } from "./stats.js";
+
+// Intent graph
+export {
+  createIntentState,
+  createIntent,
+  applyIntentCommand,
+  getIntents,
+  getIntentById,
+  IntentNotFoundError,
+  DuplicateIntentError,
+  InvalidIntentTransitionError,
+} from "./intent.js";
+export type {
+  IntentStatus,
+  Intent,
+  IntentState,
+  IntentCommand,
+  IntentLifecycleEvent,
+  IntentFilter,
+} from "./intent.js";
+
+// Task graph
+export {
+  createTaskState,
+  createTask,
+  applyTaskCommand,
+  getTasks,
+  getTaskById,
+  getTasksByIntent,
+  TaskNotFoundError,
+  DuplicateTaskError,
+  InvalidTaskTransitionError,
+} from "./task.js";
+export type {
+  TaskStatus,
+  Task,
+  TaskState,
+  TaskCommand,
+  TaskLifecycleEvent,
+  TaskFilter,
+} from "./task.js";
