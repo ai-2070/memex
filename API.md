@@ -1074,3 +1074,5 @@ const result2 = importSlice(mem, intents, tasks, slice, {
 | ID exists, different content | true | true | true | New id minted, imported as separate entity |
 
 When `reIdOnDifference` is true, all internal references (`parents`, `Edge.from/to`, `intent_id`, `input/output_memory_ids`, `root_memory_ids`) are rewritten to the new ids. The original entity is not touched or linked.
+
+**Re-id timestamp preservation:** new ids are generated at +1ms from the original entity's timestamp (extracted from the uuidv7), not from `Date.now()`. This preserves the entity's position in time — decay scoring and recency sort are unaffected. If the +1ms id also collides, it increments by another 1ms until a free slot is found.
