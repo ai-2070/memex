@@ -292,6 +292,87 @@ Each layer has its own types, commands, reducer, and query — but they referenc
 - Optional shallow compare to detect conflicts, optional re-id to mint new ids on conflict
 - JSON-serializable slices for migration, sub-agent isolation, cloning, and backup
 
+## Multi-Agent & Crew Orchestration
+
+MemEX supports multi-agent systems where each agent works on a segment of the graph. No separate memory stores per agent — one graph, segmented by conventions.
+
+### Soft isolation (shared graph, scoped views)
+
+Each agent reads and writes to the shared graph, filtered by `meta.agent_id` and `scope`:
+
+```ts
+// agent:researcher only sees its own observations
+const myMemories = getItems(state, {
+  meta: { agent_id: "agent:researcher" },
+});
+
+// agent:analyst sees everything in a project scope
+const projectMemories = getItems(state, {
+  scope_prefix: "project:cyberdeck/",
+});
+
+// orchestrator sees all agents' work, ranked by importance
+const ranked = getScoredItems(state,
+  { authority: 0.5, importance: 0.5 },
+  { pre: { scope_prefix: "project:cyberdeck/" } },
+);
+```
+
+Agents write with their own `author` and `meta.agent_id`. The orchestrator can query across all agents, compare their findings, and resolve contradictions.
+
+### Hard isolation (exported slices)
+
+For risky operations or external sandboxes, export a slice for the sub-agent to work on independently:
+
+```ts
+// give the sub-agent a slice of the graph
+const slice = exportSlice(memState, intentState, taskState, {
+  memory_ids: relevantIds,
+  include_parents: true,
+  include_related_tasks: true,
+});
+
+// sub-agent works on its own copy...
+// ...then merge results back
+const { memState: updated, report } = importSlice(
+  memState, intentState, taskState,
+  subAgentSlice,
+);
+// report.created -> what the sub-agent added
+// existing items untouched (append-only)
+```
+
+### Crew patterns
+
+| Pattern | How |
+|---------|-----|
+| Shared workspace | All agents write to the same scope, filter by `meta.agent_id` to see own work |
+| Pipeline | Agent A's `output_memory_ids` on a task become agent B's `input_memory_ids` |
+| Review | Agent B reads agent A's items, creates `SUPPORTS` / `CONTRADICTS` edges |
+| Delegation | Orchestrator creates an intent, assigns tasks to specific agents via `task.agent_id` |
+| Sandbox | Export slice → sub-agent mutates copy → import results back |
+
+### What the `author` and `meta` fields enable
+
+```ts
+// who wrote this?
+item.author                     // "agent:researcher"
+
+// which agent instance?
+item.meta.agent_id              // "agent:researcher-v2"
+
+// which session?
+item.meta.session_id            // "session-abc"
+
+// which crew run?
+item.meta.crew_id               // "crew:investigation-42"
+
+// which intent spawned this?
+item.meta.creation_intent_id    // "i1"
+```
+
+All of these are queryable via `meta` and `meta_has` filters. The graph is one shared structure; segmentation is just queries.
+
 ## Where MemEX Fits
 
 MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.
