@@ -147,7 +147,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.created", task: cmd.task, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.created",
+            task: cmd.task,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -162,7 +167,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.updated", task: updated, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.updated",
+            task: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -171,7 +181,11 @@ export function applyTaskCommand(
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
       if (existing.status !== "pending" && existing.status !== "failed") {
-        throw new InvalidTaskTransitionError(cmd.task_id, existing.status, "running");
+        throw new InvalidTaskTransitionError(
+          cmd.task_id,
+          existing.status,
+          "running",
+        );
       }
       const updated: Task = {
         ...existing,
@@ -184,7 +198,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.started", task: updated, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.started",
+            task: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -193,7 +212,11 @@ export function applyTaskCommand(
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
       if (existing.status !== "running") {
-        throw new InvalidTaskTransitionError(cmd.task_id, existing.status, "completed");
+        throw new InvalidTaskTransitionError(
+          cmd.task_id,
+          existing.status,
+          "completed",
+        );
       }
       const updated: Task = {
         ...existing,
@@ -206,7 +229,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.completed", task: updated, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.completed",
+            task: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -215,7 +243,11 @@ export function applyTaskCommand(
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
       if (existing.status !== "running") {
-        throw new InvalidTaskTransitionError(cmd.task_id, existing.status, "failed");
+        throw new InvalidTaskTransitionError(
+          cmd.task_id,
+          existing.status,
+          "failed",
+        );
       }
       const updated: Task = {
         ...existing,
@@ -227,7 +259,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.failed", task: updated, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.failed",
+            task: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -236,7 +273,11 @@ export function applyTaskCommand(
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
       if (existing.status === "completed" || existing.status === "cancelled") {
-        throw new InvalidTaskTransitionError(cmd.task_id, existing.status, "cancelled");
+        throw new InvalidTaskTransitionError(
+          cmd.task_id,
+          existing.status,
+          "cancelled",
+        );
       }
       const updated: Task = {
         ...existing,
@@ -247,7 +288,12 @@ export function applyTaskCommand(
       return {
         state: { tasks },
         events: [
-          { namespace: "task", type: "task.cancelled", task: updated, cause_type: cmd.type },
+          {
+            namespace: "task",
+            type: "task.cancelled",
+            task: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -274,17 +320,32 @@ export function getTasks(state: TaskState, filter?: TaskFilter): Task[] {
 
   const results: Task[] = [];
   for (const task of state.tasks.values()) {
-    if (filter.intent_id !== undefined && task.intent_id !== filter.intent_id) continue;
+    if (filter.intent_id !== undefined && task.intent_id !== filter.intent_id)
+      continue;
     if (filter.action !== undefined && task.action !== filter.action) continue;
     if (filter.status !== undefined && task.status !== filter.status) continue;
-    if (filter.statuses !== undefined && !filter.statuses.includes(task.status)) continue;
-    if (filter.agent_id !== undefined && task.agent_id !== filter.agent_id) continue;
-    if (filter.min_priority !== undefined && task.priority < filter.min_priority) continue;
+    if (filter.statuses !== undefined && !filter.statuses.includes(task.status))
+      continue;
+    if (filter.agent_id !== undefined && task.agent_id !== filter.agent_id)
+      continue;
+    if (
+      filter.min_priority !== undefined &&
+      task.priority < filter.min_priority
+    )
+      continue;
     if (filter.has_input_memory_id !== undefined) {
-      if (!task.input_memory_ids || !task.input_memory_ids.includes(filter.has_input_memory_id)) continue;
+      if (
+        !task.input_memory_ids ||
+        !task.input_memory_ids.includes(filter.has_input_memory_id)
+      )
+        continue;
     }
     if (filter.has_output_memory_id !== undefined) {
-      if (!task.output_memory_ids || !task.output_memory_ids.includes(filter.has_output_memory_id)) continue;
+      if (
+        !task.output_memory_ids ||
+        !task.output_memory_ids.includes(filter.has_output_memory_id)
+      )
+        continue;
     }
     results.push(task);
   }

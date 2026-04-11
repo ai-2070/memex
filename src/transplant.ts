@@ -30,10 +30,7 @@ function uuidFromMs(ms: number): string {
 /**
  * Generate a new id 1ms after the original, incrementing until no collision.
  */
-function reIdFor(
-  originalId: string,
-  existingIds: Set<string>,
-): string {
+function reIdFor(originalId: string, existingIds: Set<string>): string {
   let ms = extractTimestamp(originalId) + 1;
   let newId = uuidFromMs(ms);
   while (existingIds.has(newId)) {
@@ -377,10 +374,7 @@ export function importSlice(
     const existing = currentIntent.intents.get(intent.id);
     if (existing) {
       if (skipExisting) {
-        if (
-          shallowCompare &&
-          !shallowEqual(existing as any, intent as any)
-        ) {
+        if (shallowCompare && !shallowEqual(existing as any, intent as any)) {
           if (doReId) {
             const newId = reIdFor(intent.id, allIntentIds);
             allIntentIds.add(newId);
@@ -388,10 +382,7 @@ export function importSlice(
             const remapped: Intent = {
               ...intent,
               id: newId,
-              root_memory_ids: rewriteIds(
-                intent.root_memory_ids,
-                memIdMap,
-              ),
+              root_memory_ids: rewriteIds(intent.root_memory_ids, memIdMap),
             };
             const result = applyIntentCommand(currentIntent, {
               type: "intent.create",
@@ -425,10 +416,7 @@ export function importSlice(
     const existing = currentTask.tasks.get(task.id);
     if (existing) {
       if (skipExisting) {
-        if (
-          shallowCompare &&
-          !shallowEqual(existing as any, task as any)
-        ) {
+        if (shallowCompare && !shallowEqual(existing as any, task as any)) {
           if (doReId) {
             const newId = reIdFor(task.id, allTaskIds);
             allTaskIds.add(newId);
@@ -437,14 +425,8 @@ export function importSlice(
               ...task,
               id: newId,
               intent_id: rewriteId(task.intent_id, intentIdMap),
-              input_memory_ids: rewriteIds(
-                task.input_memory_ids,
-                memIdMap,
-              ),
-              output_memory_ids: rewriteIds(
-                task.output_memory_ids,
-                memIdMap,
-              ),
+              input_memory_ids: rewriteIds(task.input_memory_ids, memIdMap),
+              output_memory_ids: rewriteIds(task.output_memory_ids, memIdMap),
             };
             const result = applyTaskCommand(currentTask, {
               type: "task.create",

@@ -4,11 +4,7 @@ import { uuidv7 } from "uuidv7";
 // Types
 // ---------------------------------------------------------------------------
 
-export type IntentStatus =
-  | "active"
-  | "paused"
-  | "completed"
-  | "cancelled";
+export type IntentStatus = "active" | "paused" | "completed" | "cancelled";
 
 export interface Intent {
   id: string;
@@ -64,10 +60,25 @@ export type IntentCommand =
       author: string;
       reason?: string;
     }
-  | { type: "intent.complete"; intent_id: string; author: string; reason?: string }
-  | { type: "intent.cancel"; intent_id: string; author: string; reason?: string }
+  | {
+      type: "intent.complete";
+      intent_id: string;
+      author: string;
+      reason?: string;
+    }
+  | {
+      type: "intent.cancel";
+      intent_id: string;
+      author: string;
+      reason?: string;
+    }
   | { type: "intent.pause"; intent_id: string; author: string; reason?: string }
-  | { type: "intent.resume"; intent_id: string; author: string; reason?: string };
+  | {
+      type: "intent.resume";
+      intent_id: string;
+      author: string;
+      reason?: string;
+    };
 
 // ---------------------------------------------------------------------------
 // Lifecycle events
@@ -134,7 +145,14 @@ function setStatus(
   intents.set(id, updated);
   return {
     state: { intents },
-    events: [{ namespace: "intent", type: eventType, intent: updated, cause_type: causeType }],
+    events: [
+      {
+        namespace: "intent",
+        type: eventType,
+        intent: updated,
+        cause_type: causeType,
+      },
+    ],
   };
 }
 
@@ -152,7 +170,12 @@ export function applyIntentCommand(
       return {
         state: { intents },
         events: [
-          { namespace: "intent", type: "intent.created", intent: cmd.intent, cause_type: cmd.type },
+          {
+            namespace: "intent",
+            type: "intent.created",
+            intent: cmd.intent,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
@@ -167,22 +190,59 @@ export function applyIntentCommand(
       return {
         state: { intents },
         events: [
-          { namespace: "intent", type: "intent.updated", intent: updated, cause_type: cmd.type },
+          {
+            namespace: "intent",
+            type: "intent.updated",
+            intent: updated,
+            cause_type: cmd.type,
+          },
         ],
       };
     }
 
     case "intent.complete":
-      return setStatus(state, cmd.intent_id, "completed", ["active", "paused"], cmd.author, cmd.type, "intent.completed");
+      return setStatus(
+        state,
+        cmd.intent_id,
+        "completed",
+        ["active", "paused"],
+        cmd.author,
+        cmd.type,
+        "intent.completed",
+      );
 
     case "intent.cancel":
-      return setStatus(state, cmd.intent_id, "cancelled", ["active", "paused"], cmd.author, cmd.type, "intent.cancelled");
+      return setStatus(
+        state,
+        cmd.intent_id,
+        "cancelled",
+        ["active", "paused"],
+        cmd.author,
+        cmd.type,
+        "intent.cancelled",
+      );
 
     case "intent.pause":
-      return setStatus(state, cmd.intent_id, "paused", ["active"], cmd.author, cmd.type, "intent.paused");
+      return setStatus(
+        state,
+        cmd.intent_id,
+        "paused",
+        ["active"],
+        cmd.author,
+        cmd.type,
+        "intent.paused",
+      );
 
     case "intent.resume":
-      return setStatus(state, cmd.intent_id, "active", ["paused"], cmd.author, cmd.type, "intent.resumed");
+      return setStatus(
+        state,
+        cmd.intent_id,
+        "active",
+        ["paused"],
+        cmd.author,
+        cmd.type,
+        "intent.resumed",
+      );
   }
 }
 
@@ -198,23 +258,42 @@ export interface IntentFilter {
   has_memory_id?: string;
 }
 
-export function getIntents(state: IntentState, filter?: IntentFilter): Intent[] {
+export function getIntents(
+  state: IntentState,
+  filter?: IntentFilter,
+): Intent[] {
   if (!filter) return [...state.intents.values()];
 
   const results: Intent[] = [];
   for (const intent of state.intents.values()) {
     if (filter.owner !== undefined && intent.owner !== filter.owner) continue;
-    if (filter.status !== undefined && intent.status !== filter.status) continue;
-    if (filter.statuses !== undefined && !filter.statuses.includes(intent.status)) continue;
-    if (filter.min_priority !== undefined && intent.priority < filter.min_priority) continue;
+    if (filter.status !== undefined && intent.status !== filter.status)
+      continue;
+    if (
+      filter.statuses !== undefined &&
+      !filter.statuses.includes(intent.status)
+    )
+      continue;
+    if (
+      filter.min_priority !== undefined &&
+      intent.priority < filter.min_priority
+    )
+      continue;
     if (filter.has_memory_id !== undefined) {
-      if (!intent.root_memory_ids || !intent.root_memory_ids.includes(filter.has_memory_id)) continue;
+      if (
+        !intent.root_memory_ids ||
+        !intent.root_memory_ids.includes(filter.has_memory_id)
+      )
+        continue;
     }
     results.push(intent);
   }
   return results;
 }
 
-export function getIntentById(state: IntentState, id: string): Intent | undefined {
+export function getIntentById(
+  state: IntentState,
+  id: string,
+): Intent | undefined {
   return state.intents.get(id);
 }

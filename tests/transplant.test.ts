@@ -7,11 +7,7 @@ import {
   applyIntentCommand,
   createIntent,
 } from "../src/intent.js";
-import {
-  createTaskState,
-  applyTaskCommand,
-  createTask,
-} from "../src/task.js";
+import { createTaskState, applyTaskCommand, createTask } from "../src/task.js";
 import type { MemoryItem, Edge, GraphState } from "../src/types.js";
 import type { IntentState } from "../src/intent.js";
 import type { TaskState } from "../src/task.js";
@@ -130,11 +126,7 @@ describe("exportSlice", () => {
       memory_ids: ["m3"],
       include_parents: true,
     });
-    expect(slice.memories.map((m) => m.id).sort()).toEqual([
-      "m1",
-      "m2",
-      "m3",
-    ]);
+    expect(slice.memories.map((m) => m.id).sort()).toEqual(["m1", "m2", "m3"]);
     // edges between included items
     expect(slice.edges.length).toBeGreaterThanOrEqual(2);
   });
@@ -145,11 +137,7 @@ describe("exportSlice", () => {
       memory_ids: ["m1"],
       include_children: true,
     });
-    expect(slice.memories.map((m) => m.id).sort()).toEqual([
-      "m1",
-      "m2",
-      "m3",
-    ]);
+    expect(slice.memories.map((m) => m.id).sort()).toEqual(["m1", "m2", "m3"]);
   });
 
   it("exports related intents and tasks", () => {
@@ -370,11 +358,7 @@ describe("export + import round-trip", () => {
     expect(result.memState.edges.size).toBe(2); // e1, e2
     expect(result.intentState.intents.size).toBe(1);
     expect(result.taskState.tasks.size).toBe(1);
-    expect(result.report.created.memories.sort()).toEqual([
-      "m1",
-      "m2",
-      "m3",
-    ]);
+    expect(result.report.created.memories.sort()).toEqual(["m1", "m2", "m3"]);
   });
 
   it("JSON serializable round-trip", () => {
