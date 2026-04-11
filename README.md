@@ -286,6 +286,12 @@ Each layer has its own types, commands, reducer, and query — but they referenc
 - Links to parent intent, input/output memory items, agent assignment
 - Query by intent, action, status, agent, linked memory items
 
+**Transplant (export / import):**
+- Export a self-contained slice by walking provenance chains, aliases, related intents/tasks
+- Import into another graph instance — default: skip existing ids, append-only
+- Optional shallow compare to detect conflicts, optional re-id to mint new ids on conflict
+- JSON-serializable slices for migration, sub-agent isolation, cloning, and backup
+
 ## Where MemEX Fits
 
 MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.

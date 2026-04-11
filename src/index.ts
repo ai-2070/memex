@@ -131,3 +131,12 @@ export type {
   TaskLifecycleEvent,
   TaskFilter,
 } from "./task.js";
+
+// Transplant (export/import slices)
+export { exportSlice, importSlice } from "./transplant.js";
+export type {
+  ExportOptions,
+  MemexExport,
+  ImportOptions,
+  ImportReport,
+} from "./transplant.js";

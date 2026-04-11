@@ -909,3 +909,99 @@ The three graphs (memory, intent, task) reference each other by ID:
 | Memory | Task | `MemoryItem.meta.creation_task_id` |
 
 No unified query across graphs — each graph has its own getters. The app layer composes them.
+
+---
+
+## Transplant (Export / Import)
+
+Move chains of memories, intents, and tasks between graph instances. Useful for sub-agent isolation, migration, cloning workflows, and backup.
+
+### exportSlice(memState, intentState, taskState, options)
+
+Walk the graph from anchor ids and collect a self-contained slice.
+
+```ts
+interface ExportOptions {
+  memory_ids?: string[];
+  intent_ids?: string[];
+  task_ids?: string[];
+  include_parents?: boolean;          // walk parents up-graph
+  include_children?: boolean;         // walk dependents down-graph
+  include_aliases?: boolean;          // include ALIAS groups
+  include_related_tasks?: boolean;
+  include_related_intents?: boolean;
+}
+
+interface MemexExport {
+  memories: MemoryItem[];
+  edges: Edge[];
+  intents: Intent[];
+  tasks: Task[];
+}
+```
+
+```ts
+// export a full chain: m1 + all children + related intents/tasks
+const slice = exportSlice(memState, intentState, taskState, {
+  memory_ids: ["m1"],
+  include_children: true,
+  include_related_intents: true,
+  include_related_tasks: true,
+});
+
+// slice is plain JSON — serialize and send anywhere
+const json = JSON.stringify(slice);
+```
+
+### importSlice(memState, intentState, taskState, slice, options?)
+
+Import a slice into existing state. Default: skip existing ids, never overwrite.
+
+```ts
+interface ImportOptions {
+  skipExistingIds?: boolean;              // default true
+  shallowCompareExisting?: boolean;       // default false — detect conflicts
+  reIdOnDifference?: boolean;             // default false — mint new ids on conflict
+}
+
+interface ImportReport {
+  created: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  skipped: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  conflicts: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+}
+```
+
+```ts
+// default: append new, skip existing
+const { memState, intentState, taskState, report } = importSlice(
+  currentMem, currentIntents, currentTasks,
+  slice,
+);
+// report.created.memories -> ["m2", "m3"]
+// report.skipped.memories -> ["m1"]  (already existed)
+
+// with conflict detection
+const result = importSlice(mem, intents, tasks, slice, {
+  shallowCompareExisting: true,
+});
+// result.report.conflicts.memories -> ["m1"]  (exists but different)
+
+// with re-id on conflict (mint new ids for differing entities)
+const result2 = importSlice(mem, intents, tasks, slice, {
+  shallowCompareExisting: true,
+  reIdOnDifference: true,
+});
+// conflicting entities get new uuidv7 ids, internal refs are rewritten
+```
+
+**Import behavior:**
+
+| Scenario | `skipExisting` | `shallowCompare` | `reId` | Result |
+|----------|---------------|-----------------|--------|--------|
+| ID doesn't exist | — | — | — | Created |
+| ID exists, no compare | true | false | — | Skipped |
+| ID exists, same content | true | true | — | Skipped |
+| ID exists, different content | true | true | false | Conflict (reported, not imported) |
+| ID exists, different content | true | true | true | New id minted, imported as separate entity |
+
+When `reIdOnDifference` is true, all internal references (`parents`, `Edge.from/to`, `intent_id`, `input/output_memory_ids`, `root_memory_ids`) are rewritten to the new ids. The original entity is not touched or linked.
