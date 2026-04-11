@@ -1,0 +1,23 @@
+src/transplant.ts
+  fd5a22e95eb2cd3d 10,15-44,285,298-301,313-315,384-386,432-434
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "1c21913f4effba98fc792fda71b33535972524dd",
+  "prompts": {
+    "fd5a22e95eb2cd3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad58ddf2-6885-4ace-b187-941a2635fd09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 55,
+      "total_deletions": 16,
+      "accepted_lines": 47,
+      "overriden_lines": 0
+    }
+  }
+}
