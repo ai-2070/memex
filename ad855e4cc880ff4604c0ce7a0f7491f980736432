@@ -1,0 +1,23 @@
+API.md
+  fd5a22e95eb2cd3d 1077-1078
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "ad855e4cc880ff4604c0ce7a0f7491f980736432",
+  "prompts": {
+    "fd5a22e95eb2cd3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad58ddf2-6885-4ace-b187-941a2635fd09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
