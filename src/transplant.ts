@@ -7,10 +7,41 @@ import type {
 } from "./types.js";
 import type { IntentState, Intent, IntentLifecycleEvent } from "./intent.js";
 import type { TaskState, Task, TaskLifecycleEvent } from "./task.js";
-import { getChildren, getEdges } from "./query.js";
+import { getChildren, getEdges, extractTimestamp } from "./query.js";
 import { applyCommand } from "./reducer.js";
 import { applyIntentCommand } from "./intent.js";
 import { applyTaskCommand } from "./task.js";
+
+/**
+ * Build a uuidv7-shaped id from a given ms timestamp + random suffix.
+ */
+function uuidFromMs(ms: number): string {
+  const hex = ms.toString(16).padStart(12, "0");
+  const rand = uuidv7().replace(/-/g, "");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    "7" + rand.slice(13, 16),
+    rand.slice(16, 20),
+    rand.slice(20, 32),
+  ].join("-");
+}
+
+/**
+ * Generate a new id 1ms after the original, incrementing until no collision.
+ */
+function reIdFor(
+  originalId: string,
+  existingIds: Set<string>,
+): string {
+  let ms = extractTimestamp(originalId) + 1;
+  let newId = uuidFromMs(ms);
+  while (existingIds.has(newId)) {
+    ms++;
+    newId = uuidFromMs(ms);
+  }
+  return newId;
+}
 
 // ---------------------------------------------------------------------------
 // Export
@@ -251,7 +282,7 @@ export function importSlice(
 } {
   const skipExisting = opts?.skipExistingIds ?? true;
   const shallowCompare = opts?.shallowCompareExisting ?? false;
-  const reId = opts?.reIdOnDifference ?? false;
+  const doReId = opts?.reIdOnDifference ?? false;
 
   const report: ImportReport = {
     created: { memories: [], intents: [], tasks: [], edges: [] },
@@ -264,6 +295,11 @@ export function importSlice(
   const intentIdMap = new Map<string, string>();
   const taskIdMap = new Map<string, string>();
 
+  // track all known ids for collision-free re-id generation
+  const allMemIds = new Set(memState.items.keys());
+  const allIntentIds = new Set(intentState.intents.keys());
+  const allTaskIds = new Set(taskState.tasks.keys());
+
   let currentMem = memState;
   let currentIntent = intentState;
   let currentTask = taskState;
@@ -274,8 +310,9 @@ export function importSlice(
     if (existing) {
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, item as any)) {
-          if (reId) {
-            const newId = uuidv7();
+          if (doReId) {
+            const newId = reIdFor(item.id, allMemIds);
+            allMemIds.add(newId);
             memIdMap.set(item.id, newId);
             const remapped: MemoryItem = {
               ...item,
@@ -344,8 +381,9 @@ export function importSlice(
           shallowCompare &&
           !shallowEqual(existing as any, intent as any)
         ) {
-          if (reId) {
-            const newId = uuidv7();
+          if (doReId) {
+            const newId = reIdFor(intent.id, allIntentIds);
+            allIntentIds.add(newId);
             intentIdMap.set(intent.id, newId);
             const remapped: Intent = {
               ...intent,
@@ -391,8 +429,9 @@ export function importSlice(
           shallowCompare &&
           !shallowEqual(existing as any, task as any)
         ) {
-          if (reId) {
-            const newId = uuidv7();
+          if (doReId) {
+            const newId = reIdFor(task.id, allTaskIds);
+            allTaskIds.add(newId);
             taskIdMap.set(task.id, newId);
             const remapped: Task = {
               ...task,
