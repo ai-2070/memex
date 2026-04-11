@@ -35,6 +35,67 @@ This means the system can:
 - Decay stale context while preserving stable knowledge
 - Recognize that two observations refer to the same entity
 
+## Where MemEX Fits
+
+MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.
+
+```
+┌─────────────────────────────────────────────────┐
+│                  Agent / App                     │
+│                                                  │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
+│  │  Chat     │  │ Working  │  │   Cognition   │  │
+│  │  Window   │  │ Memory   │  │   Layer       │  │
+│  │ (sliding) │  │(scratch) │  │  (thinking)   │  │
+│  └────┬─────┘  └────┬─────┘  └──────┬────────┘  │
+│       │              │               │            │
+│       └──────────────┼───────────────┘            │
+│                      │                            │
+│              ┌───────▼────────┐                   │
+│              │     MemEX      │                   │
+│              │  (this library) │                   │
+│              └───────┬────────┘                   │
+│                      │                            │
+│         ┌────────────┼────────────┐               │
+│         │            │            │               │
+│   ┌─────▼─────┐ ┌───▼───┐ ┌─────▼─────┐         │
+│   │  Vector   │ │ Text  │ │ Event     │         │
+│   │  Search   │ │ Search│ │ Store     │         │
+│   └───────────┘ └───────┘ └───────────┘         │
+└─────────────────────────────────────────────────┘
+```
+
+### How the pieces connect
+
+**Chat window (sliding context)** -- the current conversation. As messages flow, the agent extracts observations, assertions, and preferences and writes them to MemEX. The chat window is ephemeral; MemEX is where things persist.
+
+**Working memory (scratchpad)** -- short-lived, high-importance items the agent is actively reasoning about. These live in MemEX with `kind: "hypothesis"` or `kind: "assumption"` and high `importance`. After processing, their importance decays and they settle into long-term memory.
+
+**Vector / text search** -- MemEX stores structured items, not embeddings. Search tools subscribe to MemEX lifecycle events and maintain their own indexes. Search indexes are derived from MemEX, not the other way around.
+
+**Cognition layer** -- uses `getScoredItems` and `smartRetrieve` to build its thinking queue. Writes back inferred items, resolved contradictions, and updated scores. The agent prioritizes thinking using authority, conviction, and importance.
+
+**Event store** -- the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
+
+MemEX is the system of record. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
+
+### What changes in agent behavior
+
+Without MemEX, an agent:
+- Forgets between sessions, or retrieves flat text with no trust signal
+- Can't tell if something was observed, inferred, or assumed
+- Silently overwrites old beliefs with new ones
+- Can't explain why it believes something
+- Treats everything as equally important
+
+With MemEX, an agent:
+- Carries forward a structured belief state across sessions
+- Knows the difference between an observation and a hypothesis
+- Surfaces contradictions instead of hiding them
+- Can trace any belief back to its evidence chain
+- Prioritizes what to think about based on importance and uncertainty
+- Lets stale context fade while stable knowledge persists
+
 ## Install
 
 ```bash
@@ -372,67 +433,6 @@ item.meta.creation_intent_id    // "i1"
 ```
 
 All of these are queryable via `meta` and `meta_has` filters. The graph is one shared structure; segmentation is just queries.
-
-## Where MemEX Fits
-
-MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.
-
-```
-┌─────────────────────────────────────────────────┐
-│                  Agent / App                     │
-│                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │  Chat     │  │ Working  │  │   Cognition   │  │
-│  │  Window   │  │ Memory   │  │   Layer       │  │
-│  │ (sliding) │  │(scratch) │  │  (thinking)   │  │
-│  └────┬─────┘  └────┬─────┘  └──────┬────────┘  │
-│       │              │               │            │
-│       └──────────────┼───────────────┘            │
-│                      │                            │
-│              ┌───────▼────────┐                   │
-│              │     MemEX      │                   │
-│              │  (this library) │                   │
-│              └───────┬────────┘                   │
-│                      │                            │
-│         ┌────────────┼────────────┐               │
-│         │            │            │               │
-│   ┌─────▼─────┐ ┌───▼───┐ ┌─────▼─────┐         │
-│   │  Vector   │ │ Text  │ │ Event     │         │
-│   │  Search   │ │ Search│ │ Store     │         │
-│   └───────────┘ └───────┘ └───────────┘         │
-└─────────────────────────────────────────────────┘
-```
-
-### How the pieces connect
-
-**Chat window (sliding context)** -- the current conversation. As messages flow, the agent extracts observations, assertions, and preferences and writes them to MemEX. The chat window is ephemeral; MemEX is where things persist.
-
-**Working memory (scratchpad)** -- short-lived, high-importance items the agent is actively reasoning about. These live in MemEX with `kind: "hypothesis"` or `kind: "assumption"` and high `importance`. After processing, their importance decays and they settle into long-term memory.
-
-**Vector / text search** -- MemEX stores structured items, not embeddings. Search tools subscribe to MemEX lifecycle events and maintain their own indexes. Search indexes are derived from MemEX, not the other way around.
-
-**Cognition layer** -- uses `getScoredItems` and `smartRetrieve` to build its thinking queue. Writes back inferred items, resolved contradictions, and updated scores. The agent prioritizes thinking using authority, conviction, and importance.
-
-**Event store** -- the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
-
-MemEX is the system of record. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
-
-### What changes in agent behavior
-
-Without MemEX, an agent:
-- Forgets between sessions, or retrieves flat text with no trust signal
-- Can't tell if something was observed, inferred, or assumed
-- Silently overwrites old beliefs with new ones
-- Can't explain why it believes something
-- Treats everything as equally important
-
-With MemEX, an agent:
-- Carries forward a structured belief state across sessions
-- Knows the difference between an observation and a hypothesis
-- Surfaces contradictions instead of hiding them
-- Can trace any belief back to its evidence chain
-- Prioritizes what to think about based on importance and uncertainty
-- Lets stale context fade while stable knowledge persists
 
 ## Dynamic Resolution
 
