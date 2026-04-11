@@ -912,6 +912,75 @@ No unified query across graphs — each graph has its own getters. The app layer
 
 ---
 
+## Multi-Agent Memory Segmentation
+
+MemEX supports multi-agent systems with one shared graph segmented by conventions on `author`, `meta`, and `scope`.
+
+### Memory segmentation fields
+
+| Field | Convention | Example |
+|-------|-----------|---------|
+| `author` | Who created the item | `"agent:researcher"`, `"user:laz"` |
+| `meta.agent_id` | Specific agent instance | `"agent:researcher-v2"` |
+| `meta.session_id` | Session scope | `"session-abc"` |
+| `meta.crew_id` | Crew/run scope | `"crew:investigation-42"` |
+| `scope` | Logical namespace | `"project:cyberdeck/research"` |
+
+### Querying by agent
+
+```ts
+// this agent's items only
+getItems(state, { meta: { agent_id: "agent:researcher" } });
+
+// all items from a crew run
+getItems(state, { meta: { crew_id: "crew:investigation-42" } });
+
+// everything in a project, ranked
+getScoredItems(state, weights, {
+  pre: { scope_prefix: "project:cyberdeck/" },
+});
+
+// items NOT by a specific agent
+getItems(state, { not: { meta: { agent_id: "agent:bad" } } });
+```
+
+### Task assignment
+
+```ts
+// assign a task to a specific agent
+applyTaskCommand(state, {
+  type: "task.create",
+  task: createTask({
+    intent_id: "i1",
+    action: "search_linkedin",
+    priority: 0.8,
+    agent_id: "agent:researcher",     // assigned agent
+    input_memory_ids: ["m1", "m2"],
+  }),
+});
+
+// query tasks by agent
+getTasks(state, { agent_id: "agent:researcher", status: "pending" });
+```
+
+### Hard isolation via transplant
+
+For sub-agents that need to work independently:
+
+```ts
+// export a slice
+const slice = exportSlice(mem, intents, tasks, {
+  memory_ids: relevantIds,
+  include_parents: true,
+});
+
+// sub-agent works on its own copy...
+// merge back (append-only, existing items untouched)
+const { memState, report } = importSlice(mem, intents, tasks, subAgentSlice);
+```
+
+---
+
 ## Transplant (Export / Import)
 
 Move chains of memories, intents, and tasks between graph instances. Useful for sub-agent isolation, migration, cloning workflows, and backup.
