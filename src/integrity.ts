@@ -80,8 +80,9 @@ export function resolveContradiction(
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];
 
-  // find and retract the CONTRADICTS edge between them
-  let foundContradiction = false;
+  // find and retract the CONTRADICTS edge(s) between them
+  // collect matching edges first to avoid iterating a map while mutating state
+  const toRetract: string[] = [];
   for (const edge of current.edges.values()) {
     if (
       edge.kind === "CONTRADICTS" &&
@@ -89,19 +90,22 @@ export function resolveContradiction(
       ((edge.from === winnerId && edge.to === loserId) ||
         (edge.from === loserId && edge.to === winnerId))
     ) {
-      foundContradiction = true;
-      const r = applyCommand(current, {
-        type: "edge.retract",
-        edge_id: edge.edge_id,
-        author,
-        reason,
-      });
-      current = r.state;
-      allEvents.push(...r.events);
+      toRetract.push(edge.edge_id);
     }
   }
 
-  if (!foundContradiction) {
+  for (const edgeId of toRetract) {
+    const r = applyCommand(current, {
+      type: "edge.retract",
+      edge_id: edgeId,
+      author,
+      reason,
+    });
+    current = r.state;
+    allEvents.push(...r.events);
+  }
+
+  if (toRetract.length === 0) {
     throw new Error(
       `No active CONTRADICTS edge between ${winnerId} and ${loserId}`,
     );

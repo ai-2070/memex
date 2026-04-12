@@ -344,23 +344,45 @@ export function importSlice(
     report.created.memories.push(item.id);
   }
 
+  // track all known edge ids for collision-free re-id generation
+  const allEdgeIds = new Set(currentMem.edges.keys());
+
   // --- import edges ---
   for (const edge of slice.edges) {
     const existing = currentMem.edges.get(edge.edge_id);
-    if (existing && skipExisting) {
-      report.skipped.edges.push(edge.edge_id);
-      continue;
+    if (existing) {
+      if (skipExisting) {
+        if (shallowCompare && !shallowEqual(existing as any, edge as any)) {
+          if (doReId) {
+            const newId = reIdFor(edge.edge_id, allEdgeIds);
+            allEdgeIds.add(newId);
+            const remapped: Edge = {
+              ...edge,
+              edge_id: newId,
+              from: rewriteId(edge.from, memIdMap),
+              to: rewriteId(edge.to, memIdMap),
+            };
+            const result = applyCommand(currentMem, {
+              type: "edge.create",
+              edge: remapped,
+            });
+            currentMem = result.state;
+            report.created.edges.push(newId);
+          } else {
+            report.conflicts.edges.push(edge.edge_id);
+          }
+        } else {
+          report.skipped.edges.push(edge.edge_id);
+        }
+        continue;
+      }
     }
+    // no collision — create
     const remapped: Edge = {
       ...edge,
       from: rewriteId(edge.from, memIdMap),
       to: rewriteId(edge.to, memIdMap),
     };
-    if (existing) {
-      // edge id collision — skip
-      report.skipped.edges.push(edge.edge_id);
-      continue;
-    }
     const result = applyCommand(currentMem, {
       type: "edge.create",
       edge: remapped,

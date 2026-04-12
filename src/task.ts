@@ -130,6 +130,18 @@ export class InvalidTaskTransitionError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result as Partial<T>;
+}
+
+// ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
 
@@ -161,7 +173,7 @@ export function applyTaskCommand(
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
       const { id: _id, status: _status, ...rest } = cmd.partial;
-      const updated: Task = { ...existing, ...rest };
+      const updated: Task = { ...existing, ...stripUndefined(rest) };
       const tasks = new Map(state.tasks);
       tasks.set(cmd.task_id, updated);
       return {

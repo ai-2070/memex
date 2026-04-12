@@ -123,6 +123,18 @@ export class InvalidIntentTransitionError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result as Partial<T>;
+}
+
+// ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
 
@@ -184,7 +196,7 @@ export function applyIntentCommand(
       const existing = state.intents.get(cmd.intent_id);
       if (!existing) throw new IntentNotFoundError(cmd.intent_id);
       const { id: _id, status: _status, ...rest } = cmd.partial;
-      const updated: Intent = { ...existing, ...rest };
+      const updated: Intent = { ...existing, ...stripUndefined(rest) };
       const intents = new Map(state.intents);
       intents.set(cmd.intent_id, updated);
       return {
