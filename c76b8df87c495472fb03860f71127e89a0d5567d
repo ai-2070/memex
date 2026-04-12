@@ -1,0 +1,27 @@
+src/query.ts
+  fd5a22e95eb2cd3d 206
+tests/edge-cases-v2.test.ts
+  fd5a22e95eb2cd3d 1-355
+src/retrieval.ts
+  fd5a22e95eb2cd3d 151-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "c76b8df87c495472fb03860f71127e89a0d5567d",
+  "prompts": {
+    "fd5a22e95eb2cd3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad58ddf2-6885-4ace-b187-941a2635fd09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 366,
+      "total_deletions": 7,
+      "accepted_lines": 360,
+      "overriden_lines": 0
+    }
+  }
+}
