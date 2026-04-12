@@ -473,6 +473,9 @@ export function importSlice(
     const remapped: Task = {
       ...task,
       intent_id: rewriteId(task.intent_id, intentIdMap),
+      parent_id: task.parent_id
+        ? rewriteId(task.parent_id, taskIdMap)
+        : undefined,
       input_memory_ids: rewriteIds(task.input_memory_ids, memIdMap),
       output_memory_ids: rewriteIds(task.output_memory_ids, memIdMap),
     };
