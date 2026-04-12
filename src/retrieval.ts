@@ -118,6 +118,18 @@ export function filterContradictions(
       scoreMap.set(entry.item.id, entry.score);
     }
 
+    // Sort contradiction edges deterministically: highest max-score pair first,
+    // then by min-score descending, then by edge_id for absolute stability.
+    contradictEdges.sort((a, b) => {
+      const maxA = Math.max(scoreMap.get(a.from) ?? -1, scoreMap.get(a.to) ?? -1);
+      const maxB = Math.max(scoreMap.get(b.from) ?? -1, scoreMap.get(b.to) ?? -1);
+      if (maxA !== maxB) return maxB - maxA;
+      const minA = Math.min(scoreMap.get(a.from) ?? -1, scoreMap.get(a.to) ?? -1);
+      const minB = Math.min(scoreMap.get(b.from) ?? -1, scoreMap.get(b.to) ?? -1);
+      if (minA !== minB) return minB - minA;
+      return a.edge_id < b.edge_id ? -1 : 1;
+    });
+
     const excluded = new Set<string>();
     for (const edge of contradictEdges) {
       if (excluded.has(edge.from) || excluded.has(edge.to)) continue;

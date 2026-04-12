@@ -109,13 +109,13 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
 
   // decay
   if (filter.decay) {
-    const multiplier = computeDecayMultiplier(item.id, filter.decay.config);
+    const multiplier = computeDecayMultiplier(item, filter.decay.config);
     if (multiplier < filter.decay.min) return false;
   }
 
   // created
   if (filter.created) {
-    const ts = extractTimestamp(item.id);
+    const ts = itemTimestamp(item);
     if (filter.created.before !== undefined && ts >= filter.created.before)
       return false;
     if (filter.created.after !== undefined && ts < filter.created.after)
@@ -149,6 +149,10 @@ export function extractTimestamp(uuidv7Id: string): number {
   return parseInt(hex, 16);
 }
 
+function itemTimestamp(item: MemoryItem): number {
+  return item.created_at ?? extractTimestamp(item.id);
+}
+
 function getSortValue(item: MemoryItem, field: SortField): number {
   switch (field) {
     case "authority":
@@ -158,7 +162,7 @@ function getSortValue(item: MemoryItem, field: SortField): number {
     case "importance":
       return item.importance ?? 0;
     case "recency":
-      return extractTimestamp(item.id);
+      return itemTimestamp(item);
   }
 }
 
@@ -209,10 +213,10 @@ const INTERVAL_MS: Record<string, number> = {
 };
 
 function computeDecayMultiplier(
-  itemId: string,
+  item: MemoryItem,
   decay: import("./types.js").DecayConfig,
 ): number {
-  const ageMs = Date.now() - extractTimestamp(itemId);
+  const ageMs = Date.now() - itemTimestamp(item);
   if (ageMs <= 0) return 1; // future item (clock skew) — no decay
   const intervalMs = INTERVAL_MS[decay.interval];
   if (intervalMs === undefined) {
@@ -240,7 +244,7 @@ function computeScore(item: MemoryItem, weights: ScoreWeights): number {
 
   if (!weights.decay) return base;
 
-  return base * computeDecayMultiplier(item.id, weights.decay);
+  return base * computeDecayMultiplier(item, weights.decay);
 }
 
 export interface ScoredQueryOptions {

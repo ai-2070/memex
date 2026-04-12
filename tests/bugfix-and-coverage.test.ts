@@ -628,7 +628,7 @@ describe("serialization — error handling", () => {
 // ============================================================
 
 describe("importSlice — skipExistingIds: false", () => {
-  it("throws DuplicateMemoryError when importing existing id with skipExisting=false", () => {
+  it("updates existing memory when importing with skipExisting=false", () => {
     const mem = stateWith([makeItem("m1")]);
     const intents = createIntentState();
     const tasks = createTaskState();
@@ -640,9 +640,9 @@ describe("importSlice — skipExistingIds: false", () => {
       tasks: [],
     };
 
-    expect(() =>
-      importSlice(mem, intents, tasks, slice, { skipExistingIds: false }),
-    ).toThrow(DuplicateMemoryError);
+    const result = importSlice(mem, intents, tasks, slice, { skipExistingIds: false });
+    expect(result.memState.items.get("m1")!.content).toEqual({ new: true });
+    expect(result.report.updated.memories).toEqual(["m1"]);
   });
 
   it("creates non-colliding items with skipExisting=false", () => {
@@ -774,23 +774,23 @@ describe("applyDiversity — mixed parents", () => {
 // ============================================================
 
 describe("mergeItem — edge cases", () => {
-  it("stripUndefined prevents accidental key deletion in content", () => {
+  it("setting content key to undefined removes it", () => {
     const existing = makeItem("m1", { content: { a: 1, b: 2 } });
     const merged = mergeItem(existing, {
       content: { a: undefined, c: 3 } as any,
     });
-    // a should be preserved (undefined stripped), b preserved, c added
-    expect(merged.content.a).toBe(1);
+    // a should be removed (set to undefined), b preserved, c added
+    expect("a" in merged.content).toBe(false);
     expect(merged.content.b).toBe(2);
     expect(merged.content.c).toBe(3);
   });
 
-  it("stripUndefined prevents accidental key deletion in meta", () => {
+  it("setting meta key to undefined removes it", () => {
     const existing = makeItem("m1", { meta: { agent_id: "bot", x: 1 } });
     const merged = mergeItem(existing, {
       meta: { agent_id: undefined, y: 2 } as any,
     });
-    expect(merged.meta!.agent_id).toBe("bot");
+    expect("agent_id" in merged.meta!).toBe(false);
     expect(merged.meta!.x).toBe(1);
     expect(merged.meta!.y).toBe(2);
   });

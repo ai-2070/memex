@@ -46,6 +46,8 @@ export interface MemoryItem {
   conviction?: number; // 0..1 -- how sure was the author?
   importance?: number; // 0..1 -- how much attention does this need right now? (salience)
 
+  created_at?: number; // unix ms — auto-populated by createMemoryItem
+
   intent_id?: string; // intent that produced this item
   task_id?: string; // task that produced this item
 

@@ -222,6 +222,12 @@ export interface ImportReport {
     tasks: string[];
     edges: string[];
   };
+  updated: {
+    memories: string[];
+    intents: string[];
+    tasks: string[];
+    edges: string[];
+  };
   skipped: {
     memories: string[];
     intents: string[];
@@ -279,6 +285,7 @@ export function importSlice(
 
   const report: ImportReport = {
     created: { memories: [], intents: [], tasks: [], edges: [] },
+    updated: { memories: [], intents: [], tasks: [], edges: [] },
     skipped: { memories: [], intents: [], tasks: [], edges: [] },
     conflicts: { memories: [], intents: [], tasks: [], edges: [] },
   };
@@ -326,6 +333,17 @@ export function importSlice(
         }
         continue;
       }
+      // skipExisting is false — update existing item
+      const { id: _id, ...rest } = item;
+      const result = applyCommand(currentMem, {
+        type: "memory.update",
+        item_id: item.id,
+        partial: { ...rest, parents: rewriteIds(item.parents, memIdMap) },
+        author: item.author,
+      });
+      currentMem = result.state;
+      report.updated.memories.push(item.id);
+      continue;
     }
     // no collision — create
     const remapped: MemoryItem = {
@@ -372,6 +390,17 @@ export function importSlice(
         }
         continue;
       }
+      // skipExisting is false — update existing edge
+      const { edge_id: _eid, from: _from, to: _to, ...edgeRest } = edge;
+      const result = applyCommand(currentMem, {
+        type: "edge.update",
+        edge_id: edge.edge_id,
+        partial: edgeRest,
+        author: edge.author,
+      });
+      currentMem = result.state;
+      report.updated.edges.push(edge.edge_id);
+      continue;
     }
     // no collision — create
     const remapped: Edge = {
@@ -419,6 +448,23 @@ export function importSlice(
         }
         continue;
       }
+      // skipExisting is false — update existing intent
+      const { id: _iid, status: _istatus, ...intentRest } = intent;
+      const result = applyIntentCommand(currentIntent, {
+        type: "intent.update",
+        intent_id: intent.id,
+        partial: {
+          ...intentRest,
+          parent_id: intent.parent_id
+            ? rewriteId(intent.parent_id, intentIdMap)
+            : undefined,
+          root_memory_ids: rewriteIds(intent.root_memory_ids, memIdMap),
+        },
+        author: intent.owner,
+      });
+      currentIntent = result.state;
+      report.updated.intents.push(intent.id);
+      continue;
     }
     const remapped: Intent = {
       ...intent,
@@ -469,6 +515,25 @@ export function importSlice(
         }
         continue;
       }
+      // skipExisting is false — update existing task
+      const { id: _tid, status: _tstatus, ...taskRest } = task;
+      const result = applyTaskCommand(currentTask, {
+        type: "task.update",
+        task_id: task.id,
+        partial: {
+          ...taskRest,
+          intent_id: rewriteId(task.intent_id, intentIdMap),
+          parent_id: task.parent_id
+            ? rewriteId(task.parent_id, taskIdMap)
+            : undefined,
+          input_memory_ids: rewriteIds(task.input_memory_ids, memIdMap),
+          output_memory_ids: rewriteIds(task.output_memory_ids, memIdMap),
+        },
+        author: task.agent_id ?? "system:import",
+      });
+      currentTask = result.state;
+      report.updated.tasks.push(task.id);
+      continue;
     }
     const remapped: Task = {
       ...task,
@@ -485,6 +550,36 @@ export function importSlice(
     });
     currentTask = result.state;
     report.created.tasks.push(task.id);
+  }
+
+  // --- second pass: remap intent_id / task_id on imported memories ---
+  if (intentIdMap.size > 0 || taskIdMap.size > 0) {
+    const importedMemIds = [
+      ...report.created.memories,
+      ...report.updated.memories,
+    ];
+    for (const memId of importedMemIds) {
+      const item = currentMem.items.get(memId);
+      if (!item) continue;
+      const newIntentId = item.intent_id
+        ? intentIdMap.get(item.intent_id)
+        : undefined;
+      const newTaskId = item.task_id
+        ? taskIdMap.get(item.task_id)
+        : undefined;
+      if (newIntentId || newTaskId) {
+        const partial: Partial<MemoryItem> = {};
+        if (newIntentId) partial.intent_id = newIntentId;
+        if (newTaskId) partial.task_id = newTaskId;
+        const result = applyCommand(currentMem, {
+          type: "memory.update",
+          item_id: memId,
+          partial,
+          author: "system:import",
+        });
+        currentMem = result.state;
+      }
+    }
   }
 
   return {
