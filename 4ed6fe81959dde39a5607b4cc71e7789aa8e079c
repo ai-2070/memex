@@ -1,0 +1,23 @@
+tests/cross-graph-fields.test.ts
+  9b0fd1b59abf21ad 1-378
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4ed6fe81959dde39a5607b4cc71e7789aa8e079c",
+  "prompts": {
+    "9b0fd1b59abf21ad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b1a6dbf7-e480-441c-9b46-c17a00c23c72",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 378,
+      "overriden_lines": 0
+    }
+  }
+}
