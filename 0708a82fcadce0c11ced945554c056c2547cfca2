@@ -1,0 +1,35 @@
+src/reducer.ts
+  16988f1cd1597e54 48-49
+src/query.ts
+  16988f1cd1597e54 111,207-213
+src/integrity.ts
+  16988f1cd1597e54 84,92,104-107
+tests/bugfix-and-coverage.test.ts
+  16988f1cd1597e54 1-958
+src/intent.ts
+  16988f1cd1597e54 186
+src/task.ts
+  16988f1cd1597e54 163
+src/retrieval.ts
+  16988f1cd1597e54 129-136,244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "0708a82fcadce0c11ced945554c056c2547cfca2",
+  "prompts": {
+    "16988f1cd1597e54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86f42947-7d4d-4016-98e1-04d9f6d61291",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 1005,
+      "total_deletions": 25,
+      "accepted_lines": 987,
+      "overriden_lines": 0
+    }
+  }
+}
