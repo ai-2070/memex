@@ -126,7 +126,14 @@ export function filterContradictions(
       const scoreB = scoreMap.get(edge.to) ?? -1;
 
       if (scoreA >= 0 && scoreB >= 0) {
-        excluded.add(scoreA >= scoreB ? edge.to : edge.from);
+        if (scoreA !== scoreB) {
+          excluded.add(scoreA > scoreB ? edge.to : edge.from);
+        } else {
+          // deterministic tiebreak: exclude the lexicographically larger id
+          excluded.add(
+            edge.from < edge.to ? edge.to : edge.from,
+          );
+        }
       }
     }
 
@@ -234,7 +241,7 @@ export function applyDiversity(
     }
 
     return {
-      item: entry.item,
+      ...entry,
       score: Math.max(0, entry.score - penalty),
     };
   });

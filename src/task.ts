@@ -160,7 +160,7 @@ export function applyTaskCommand(
     case "task.update": {
       const existing = state.tasks.get(cmd.task_id);
       if (!existing) throw new TaskNotFoundError(cmd.task_id);
-      const { id: _id, ...rest } = cmd.partial;
+      const { id: _id, status: _status, ...rest } = cmd.partial;
       const updated: Task = { ...existing, ...rest };
       const tasks = new Map(state.tasks);
       tasks.set(cmd.task_id, updated);

@@ -45,7 +45,8 @@ export function mergeItem(
 }
 
 function mergeEdge(existing: Edge, partial: Partial<Edge>): Edge {
-  return { ...existing, ...partial };
+  const { edge_id: _eid, from: _from, to: _to, ...rest } = partial;
+  return { ...existing, ...stripUndefined(rest) };
 }
 
 export function applyCommand(

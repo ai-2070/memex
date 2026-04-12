@@ -183,7 +183,7 @@ export function applyIntentCommand(
     case "intent.update": {
       const existing = state.intents.get(cmd.intent_id);
       if (!existing) throw new IntentNotFoundError(cmd.intent_id);
-      const { id: _id, ...rest } = cmd.partial;
+      const { id: _id, status: _status, ...rest } = cmd.partial;
       const updated: Intent = { ...existing, ...rest };
       const intents = new Map(state.intents);
       intents.set(cmd.intent_id, updated);

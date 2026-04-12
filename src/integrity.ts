@@ -81,6 +81,7 @@ export function resolveContradiction(
   const allEvents: MemoryLifecycleEvent[] = [];
 
   // find and retract the CONTRADICTS edge between them
+  let foundContradiction = false;
   for (const edge of current.edges.values()) {
     if (
       edge.kind === "CONTRADICTS" &&
@@ -88,6 +89,7 @@ export function resolveContradiction(
       ((edge.from === winnerId && edge.to === loserId) ||
         (edge.from === loserId && edge.to === winnerId))
     ) {
+      foundContradiction = true;
       const r = applyCommand(current, {
         type: "edge.retract",
         edge_id: edge.edge_id,
@@ -97,6 +99,12 @@ export function resolveContradiction(
       current = r.state;
       allEvents.push(...r.events);
     }
+  }
+
+  if (!foundContradiction) {
+    throw new Error(
+      `No active CONTRADICTS edge between ${winnerId} and ${loserId}`,
+    );
   }
 
   // create SUPERSEDES edge

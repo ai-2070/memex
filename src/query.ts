@@ -108,7 +108,7 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
     const ts = extractTimestamp(item.id);
     if (filter.created.before !== undefined && ts >= filter.created.before)
       return false;
-    if (filter.created.after !== undefined && ts <= filter.created.after)
+    if (filter.created.after !== undefined && ts < filter.created.after)
       return false;
   }
 
@@ -204,7 +204,13 @@ function computeDecayMultiplier(
 ): number {
   const ageMs = Date.now() - extractTimestamp(itemId);
   if (ageMs <= 0) return 1; // future item (clock skew) — no decay
-  const intervals = ageMs / INTERVAL_MS[decay.interval];
+  const intervalMs = INTERVAL_MS[decay.interval];
+  if (intervalMs === undefined) {
+    throw new RangeError(
+      `Unknown decay interval: "${decay.interval}". Expected "hour", "day", or "week".`,
+    );
+  }
+  const intervals = ageMs / intervalMs;
 
   switch (decay.type) {
     case "exponential":
