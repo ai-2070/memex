@@ -1052,8 +1052,9 @@ interface ImportOptions {
 }
 
 interface ImportReport {
-  created: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
-  skipped: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  created:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  updated:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  skipped:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
   conflicts: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
 }
 ```
