@@ -1,4 +1,4 @@
-# MemEX — Structured Memory for AI agents
+# MemEX — Structured Memory for AI Agents
 
 Multi-session continuity for AI systems.
 
