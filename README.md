@@ -317,6 +317,41 @@ Most AI systems mix these together: goals hidden in prompts, tasks implicit in c
 
 Each layer has its own types, commands, reducer, and query — but they reference each other by ID and share the same event envelope pattern. The separation is what makes the loop auditable: you can trace any belief back to the task that produced it, the intent that motivated it, and the evidence it was based on.
 
+## Cognitive Transfer
+
+The three graphs together form a complete cognitive state that can be serialized, transferred, and resumed by another agent.
+
+```
+Agent A → Agent B:
+
+  Memory export  (what I know)
++ Intent export  (what I want)
++ Task export    (what I've tried, what worked, what failed)
+= Complete cognitive state transferred
+```
+
+This isn't just data migration. The receiving agent inherits:
+
+- **Context** — the belief state (observations, hypotheses, contradictions)
+- **Direction** — active goals and their priorities
+- **Progress** — which approaches were tried, which failed, which are still running
+
+The agent picks up where the other left off. It doesn't re-derive context from scratch. It doesn't retry failed approaches. It continues.
+
+### The vector model
+
+Think of the three graphs as a cognitive vector:
+
+| Component | Role | Analogy |
+|-----------|------|---------|
+| **Memory** | Origin | Starting point in state space — what is known |
+| **Intent** | Magnitude | How much energy is allocated — priority and importance |
+| **Task** | Direction | Which approaches have been tried — path through solution space |
+
+Transferring cognition between agents is transferring this vector. The receiving agent starts from the same origin (memory), pursues the same goals with the same energy (intent), and avoids the same dead ends (task history).
+
+This is what `exportSlice` / `importSlice` enables at the library level. The transport layer (network, bus, file) is outside the library; MemEX provides the serializable structure.
+
 ## Features
 
 **Memory graph:**
