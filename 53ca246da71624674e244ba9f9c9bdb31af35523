@@ -1,0 +1,39 @@
+tests/bugfix-and-coverage.test.ts
+  be6478c53374c734 631,643-645,777,782-783,788,793
+src/helpers.ts
+  be6478c53374c734 10-21,23,29,32-33
+src/query.ts
+  be6478c53374c734 112,118,152-155,165,216,219,247
+tests/bugfix-regressions.test.ts
+  be6478c53374c734 1-588
+src/types.ts
+  be6478c53374c734 49-50
+src/retrieval.ts
+  be6478c53374c734 121-132
+src/transplant.ts
+  be6478c53374c734 225-230,288,336-346,393-403,451-467,518-536,555-584
+src/reducer.ts
+  be6478c53374c734 23-33,49,53
+tests/edge-cases-v2.test.ts
+  be6478c53374c734 229,240-241,246,257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "53ca246da71624674e244ba9f9c9bdb31af35523",
+  "prompts": {
+    "be6478c53374c734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea560e81-bb13-499f-b444-0e6030ed09c5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 750,
+      "total_deletions": 24,
+      "accepted_lines": 750,
+      "overriden_lines": 0
+    }
+  }
+}
