@@ -621,13 +621,13 @@ describe("resolveContradiction with multiple CONTRADICTS edges", () => {
 });
 
 // =========================================================================
-// 10. exportSlice with include_related_intents via meta.creation_intent_id
+// 10. exportSlice with include_related_intents via intent_id
 // =========================================================================
 
-describe("exportSlice walks meta.creation_intent_id", () => {
-  it("includes intents referenced by memory meta", () => {
+describe("exportSlice walks intent_id", () => {
+  it("includes intents referenced by memory intent_id", () => {
     const memState = stateWith([
-      makeItem("m1", { meta: { creation_intent_id: "i1" } }),
+      makeItem("m1", { intent_id: "i1" }),
     ]);
     let intentState = createIntentState();
     const intent = createIntent({
@@ -653,13 +653,13 @@ describe("exportSlice walks meta.creation_intent_id", () => {
 });
 
 // =========================================================================
-// 11. exportSlice with include_related_tasks via meta.creation_task_id
+// 11. exportSlice with include_related_tasks via task_id
 // =========================================================================
 
-describe("exportSlice walks meta.creation_task_id", () => {
-  it("includes tasks referenced by memory meta", () => {
+describe("exportSlice walks task_id", () => {
+  it("includes tasks referenced by memory task_id", () => {
     const memState = stateWith([
-      makeItem("m1", { meta: { creation_task_id: "t1" } }),
+      makeItem("m1", { task_id: "t1" }),
     ]);
     const intentState = createIntentState();
     let taskState = createTaskState();

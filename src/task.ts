@@ -14,6 +14,7 @@ export type TaskStatus =
 export interface Task {
   id: string;
   intent_id: string;
+  parent_id?: string; // parent task for subtask hierarchies
 
   action: string; // "search_linkedin", "summarize_case"
   label?: string;
@@ -325,6 +326,8 @@ export interface TaskFilter {
   min_priority?: number;
   has_input_memory_id?: string;
   has_output_memory_id?: string;
+  parent_id?: string;
+  is_root?: boolean; // true = no parent, false = has parent
 }
 
 export function getTasks(state: TaskState, filter?: TaskFilter): Task[] {
@@ -359,6 +362,13 @@ export function getTasks(state: TaskState, filter?: TaskFilter): Task[] {
       )
         continue;
     }
+    if (filter.parent_id !== undefined && task.parent_id !== filter.parent_id)
+      continue;
+    if (filter.is_root !== undefined) {
+      const hasParent = task.parent_id !== undefined;
+      if (filter.is_root && hasParent) continue;
+      if (!filter.is_root && !hasParent) continue;
+    }
     results.push(task);
   }
   return results;
@@ -370,4 +380,11 @@ export function getTaskById(state: TaskState, id: string): Task | undefined {
 
 export function getTasksByIntent(state: TaskState, intentId: string): Task[] {
   return getTasks(state, { intent_id: intentId });
+}
+
+export function getChildTasks(
+  state: TaskState,
+  parentId: string,
+): Task[] {
+  return getTasks(state, { parent_id: parentId });
 }

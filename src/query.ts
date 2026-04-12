@@ -60,6 +60,16 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
   )
     return false;
 
+  // cross-graph links
+  if (filter.intent_id !== undefined && item.intent_id !== filter.intent_id)
+    return false;
+  if (filter.intent_ids !== undefined && (!item.intent_id || !filter.intent_ids.includes(item.intent_id)))
+    return false;
+  if (filter.task_id !== undefined && item.task_id !== filter.task_id)
+    return false;
+  if (filter.task_ids !== undefined && (!item.task_id || !filter.task_ids.includes(item.task_id)))
+    return false;
+
   // score ranges
   if (filter.range) {
     if (!matchesRange(item.authority, filter.range.authority)) return false;

@@ -46,6 +46,9 @@ export interface MemoryItem {
   conviction?: number; // 0..1 -- how sure was the author?
   importance?: number; // 0..1 -- how much attention does this need right now? (salience)
 
+  intent_id?: string; // intent that produced this item
+  task_id?: string; // task that produced this item
+
   meta?: {
     agent_id?: string;
     session_id?: string;
@@ -180,6 +183,11 @@ export interface MemoryFilter {
     conviction?: { min?: number; max?: number };
     importance?: { min?: number; max?: number };
   };
+
+  intent_id?: string; // exact match on intent_id
+  intent_ids?: string[]; // match any of these intent_ids
+  task_id?: string; // exact match on task_id
+  task_ids?: string[]; // match any of these task_ids
 
   has_parent?: string; // sugar for parents.includes
   is_root?: boolean; // sugar for parents.count.max = 0

@@ -291,11 +291,17 @@ All three follow the same pattern: commands → reducer → lifecycle events. Th
 // intent links to memory items that motivated it
 const intent = createIntent({ label: "find_kati", root_memory_ids: [obs.id], ... });
 
+// sub-intent decomposes a parent goal
+const sub = createIntent({ label: "check_financials", parent_id: intent.id, ... });
+
 // task links to its parent intent and memory items it consumes/produces
 const task = createTask({ intent_id: intent.id, input_memory_ids: [obs.id], ... });
 
+// subtask breaks a task into steps
+const step = createTask({ intent_id: intent.id, parent_id: task.id, action: "parse_profile", ... });
+
 // after task completes, memory items link back
-createMemoryItem({ ..., meta: { creation_intent_id: intent.id, creation_task_id: task.id } });
+createMemoryItem({ ..., intent_id: intent.id, task_id: task.id });
 ```
 
 ## The Loop
@@ -384,7 +390,7 @@ Memory is no longer a local resource. It is portable belief.
 ## Features
 
 **Memory graph:**
-- Full query algebra: `and`, `or`, `not`, `range`, `ids`, `scope_prefix`, `parents` (includes/count), `meta` (dot-path), `meta_has`, `created` (time range), `decay` (freshness filter)
+- Full query algebra: `and`, `or`, `not`, `range`, `ids`, `scope_prefix`, `parents` (includes/count), `intent_id`, `task_id`, `meta` (dot-path), `meta_has`, `created` (time range), `decay` (freshness filter)
 - Multi-sort with tiebreakers (authority, conviction, importance, recency)
 - Configurable time decay: exponential, linear, or step -- applied at query time, not stored
 - Scored retrieval with pre/post filters, min_score threshold, and decay
@@ -403,13 +409,15 @@ Memory is no longer a local resource. It is portable belief.
 
 **Intent graph:**
 - Status machine: active ↔ paused → completed / cancelled
-- Query by owner, status, priority, linked memory items
+- Sub-intent hierarchies via `parent_id`
+- Query by owner, status, priority, parent, linked memory items
 - Invalid transitions throw typed errors
 
 **Task graph:**
 - Status machine: pending → running → completed / failed, with retry support (failed → running)
+- Subtask hierarchies via `parent_id`
 - Links to parent intent, input/output memory items, agent assignment
-- Query by intent, action, status, agent, linked memory items
+- Query by intent, action, status, agent, parent, linked memory items
 
 **Transplant (export / import):**
 - Export a self-contained slice by walking provenance chains, aliases, related intents/tasks
@@ -493,7 +501,10 @@ item.meta.session_id            // "session-abc"
 item.meta.crew_id               // "crew:investigation-42"
 
 // which intent spawned this?
-item.meta.creation_intent_id    // "i1"
+item.intent_id                  // "i1"
+
+// which task produced this?
+item.task_id                    // "t1"
 ```
 
 All of these are queryable via `meta` and `meta_has` filters. The graph is one shared structure; segmentation is just queries.

@@ -148,12 +148,10 @@ export function exportSlice(
         }
       }
     }
-    // also check memory meta for creation_intent_id
+    // also check memory items for linked intent
     for (const mid of memoryIds) {
       const item = memState.items.get(mid);
-      if (item?.meta?.creation_intent_id) {
-        intentIds.add(item.meta.creation_intent_id as string);
-      }
+      if (item?.intent_id) intentIds.add(item.intent_id);
     }
   }
 
@@ -172,12 +170,10 @@ export function exportSlice(
         taskIds.add(task.id);
       }
     }
-    // also check memory meta for creation_task_id
+    // also check memory items for linked task
     for (const mid of memoryIds) {
       const item = memState.items.get(mid);
-      if (item?.meta?.creation_task_id) {
-        taskIds.add(item.meta.creation_task_id as string);
-      }
+      if (item?.task_id) taskIds.add(item.task_id);
     }
   }
 
@@ -404,6 +400,9 @@ export function importSlice(
             const remapped: Intent = {
               ...intent,
               id: newId,
+              parent_id: intent.parent_id
+                ? rewriteId(intent.parent_id, intentIdMap)
+                : undefined,
               root_memory_ids: rewriteIds(intent.root_memory_ids, memIdMap),
             };
             const result = applyIntentCommand(currentIntent, {
@@ -423,6 +422,9 @@ export function importSlice(
     }
     const remapped: Intent = {
       ...intent,
+      parent_id: intent.parent_id
+        ? rewriteId(intent.parent_id, intentIdMap)
+        : undefined,
       root_memory_ids: rewriteIds(intent.root_memory_ids, memIdMap),
     };
     const result = applyIntentCommand(currentIntent, {
@@ -447,6 +449,9 @@ export function importSlice(
               ...task,
               id: newId,
               intent_id: rewriteId(task.intent_id, intentIdMap),
+              parent_id: task.parent_id
+                ? rewriteId(task.parent_id, taskIdMap)
+                : undefined,
               input_memory_ids: rewriteIds(task.input_memory_ids, memIdMap),
               output_memory_ids: rewriteIds(task.output_memory_ids, memIdMap),
             };

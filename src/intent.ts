@@ -8,6 +8,7 @@ export type IntentStatus = "active" | "paused" | "completed" | "cancelled";
 
 export interface Intent {
   id: string;
+  parent_id?: string; // parent intent for sub-intent hierarchies
   label: string;
   description?: string;
 
@@ -268,6 +269,8 @@ export interface IntentFilter {
   statuses?: IntentStatus[];
   min_priority?: number;
   has_memory_id?: string;
+  parent_id?: string;
+  is_root?: boolean; // true = no parent, false = has parent
 }
 
 export function getIntents(
@@ -298,6 +301,13 @@ export function getIntents(
       )
         continue;
     }
+    if (filter.parent_id !== undefined && intent.parent_id !== filter.parent_id)
+      continue;
+    if (filter.is_root !== undefined) {
+      const hasParent = intent.parent_id !== undefined;
+      if (filter.is_root && hasParent) continue;
+      if (!filter.is_root && !hasParent) continue;
+    }
     results.push(intent);
   }
   return results;
@@ -308,4 +318,11 @@ export function getIntentById(
   id: string,
 ): Intent | undefined {
   return state.intents.get(id);
+}
+
+export function getChildIntents(
+  state: IntentState,
+  parentId: string,
+): Intent[] {
+  return getIntents(state, { parent_id: parentId });
 }

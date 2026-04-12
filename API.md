@@ -21,6 +21,9 @@ interface MemoryItem {
   conviction?: number;           // 0..1 -- how sure was the author?
   importance?: number;           // 0..1 -- how much attention does this need right now? (salience)
 
+  intent_id?: string;            // intent that produced this item
+  task_id?: string;              // task that produced this item
+
   meta?: {
     agent_id?: string;
     session_id?: string;
@@ -220,6 +223,11 @@ interface MemoryFilter {
   author?: string;
   kind?: MemoryKind;
   source_kind?: SourceKind;
+
+  intent_id?: string;            // exact match on intent_id
+  intent_ids?: string[];         // match any of these intent_ids
+  task_id?: string;              // exact match on task_id
+  task_ids?: string[];           // match any of these task_ids
 
   range?: {
     authority?: { min?: number; max?: number };
@@ -757,6 +765,7 @@ type IntentStatus = "active" | "paused" | "completed" | "cancelled";
 
 interface Intent {
   id: string;
+  parent_id?: string;            // parent intent for sub-intent hierarchies
   label: string;
   description?: string;
   priority: number;              // 0..1
@@ -808,10 +817,13 @@ interface IntentFilter {
   statuses?: IntentStatus[];
   min_priority?: number;
   has_memory_id?: string;        // intent references this memory item
+  parent_id?: string;            // filter by parent intent
+  is_root?: boolean;             // true = no parent, false = has parent
 }
 
 getIntents(state, { owner: "user:laz", statuses: ["active", "paused"] });
 getIntentById(state, "i1");
+getChildIntents(state, "i1");    // all intents with parent_id = "i1"
 ```
 
 ---
@@ -828,6 +840,7 @@ type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 interface Task {
   id: string;
   intent_id: string;             // parent intent
+  parent_id?: string;            // parent task for subtask hierarchies
   action: string;                // "search_linkedin", "summarize_case"
   label?: string;
   status: TaskStatus;
@@ -886,10 +899,13 @@ interface TaskFilter {
   min_priority?: number;
   has_input_memory_id?: string;
   has_output_memory_id?: string;
+  parent_id?: string;            // filter by parent task
+  is_root?: boolean;             // true = no parent, false = has parent
 }
 
 getTasks(state, { intent_id: "i1", statuses: ["pending", "running"] });
 getTaskById(state, "t1");
+getChildTasks(state, "t1");      // all tasks with parent_id = "t1"
 getTasksByIntent(state, "i1");
 ```
 
@@ -902,11 +918,13 @@ The three graphs (memory, intent, task) reference each other by ID:
 | From | To | Field |
 |------|----|-------|
 | Intent | Memory | `Intent.root_memory_ids` |
+| Intent | Intent (parent) | `Intent.parent_id` |
 | Task | Intent | `Task.intent_id` |
+| Task | Task (parent) | `Task.parent_id` |
 | Task | Memory (input) | `Task.input_memory_ids` |
 | Task | Memory (output) | `Task.output_memory_ids` |
-| Memory | Intent | `MemoryItem.meta.creation_intent_id` |
-| Memory | Task | `MemoryItem.meta.creation_task_id` |
+| Memory | Intent | `MemoryItem.intent_id` |
+| Memory | Task | `MemoryItem.task_id` |
 
 No unified query across graphs — each graph has its own getters. The app layer composes them.
 
