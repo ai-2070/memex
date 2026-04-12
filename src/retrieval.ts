@@ -148,7 +148,10 @@ export function surfaceContradictions(
   scored: ScoredItem[],
 ): ScoredItem[] {
   const superseded = getSupersededIds(state);
-  let result = scored.filter((s) => !superseded.has(s.item.id));
+  // clone each entry to avoid mutating the input array
+  let result = scored
+    .filter((s) => !superseded.has(s.item.id))
+    .map((s) => ({ ...s }));
 
   const contradictEdges = getEdges(state, {
     kind: "CONTRADICTS",

@@ -203,6 +203,7 @@ function computeDecayMultiplier(
   decay: import("./types.js").DecayConfig,
 ): number {
   const ageMs = Date.now() - extractTimestamp(itemId);
+  if (ageMs <= 0) return 1; // future item (clock skew) — no decay
   const intervals = ageMs / INTERVAL_MS[decay.interval];
 
   switch (decay.type) {
