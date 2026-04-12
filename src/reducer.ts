@@ -20,6 +20,17 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return result as Partial<T>;
 }
 
+function mergeAndPrune<T extends Record<string, unknown>>(
+  base: T,
+  patch: Record<string, unknown>,
+): T {
+  const merged = { ...base, ...patch };
+  for (const key of Object.keys(merged)) {
+    if (merged[key] === undefined) delete merged[key];
+  }
+  return merged as T;
+}
+
 export function mergeItem(
   existing: MemoryItem,
   partial: Partial<MemoryItem>,
@@ -35,11 +46,11 @@ export function mergeItem(
     ...stripUndefined(rest),
     content:
       partialContent !== undefined
-        ? { ...existing.content, ...stripUndefined(partialContent) }
+        ? mergeAndPrune(existing.content, partialContent)
         : existing.content,
     meta:
       partialMeta !== undefined
-        ? { ...existing.meta, ...stripUndefined(partialMeta) }
+        ? mergeAndPrune(existing.meta ?? {}, partialMeta)
         : existing.meta,
   };
 }

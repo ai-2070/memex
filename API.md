@@ -1042,7 +1042,7 @@ const json = JSON.stringify(slice);
 
 ### importSlice(memState, intentState, taskState, slice, options?)
 
-Import a slice into existing state. Default: skip existing ids, never overwrite.
+Import a slice into existing state. Default: skip existing ids, never overwrite. With `skipExistingIds: false`, existing entities are updated in place (reported in `report.updated`).
 
 ```ts
 interface ImportOptions {
@@ -1052,8 +1052,9 @@ interface ImportOptions {
 }
 
 interface ImportReport {
-  created: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
-  skipped: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  created:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  updated:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
+  skipped:   { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
   conflicts: { memories: string[]; intents: string[]; tasks: string[]; edges: string[] };
 }
 ```
@@ -1086,6 +1087,7 @@ const result2 = importSlice(mem, intents, tasks, slice, {
 | Scenario | `skipExisting` | `shallowCompare` | `reId` | Result |
 |----------|---------------|-----------------|--------|--------|
 | ID doesn't exist | — | — | — | Created |
+| ID exists | false | — | — | Updated in place |
 | ID exists, no compare | true | false | — | Skipped |
 | ID exists, same content | true | true | — | Skipped |
 | ID exists, different content | true | true | false | Conflict (reported, not imported) |

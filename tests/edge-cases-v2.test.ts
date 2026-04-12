@@ -226,7 +226,7 @@ describe("task state machine edge cases", () => {
 // ============================================================
 
 describe("reducer nested undefined handling", () => {
-  it("strips top-level undefined in content but preserves nested undefined", () => {
+  it("setting content key to undefined removes it", () => {
     const state = stateWith([
       makeItem("m1", { content: { a: 1, b: 2 } }),
     ]);
@@ -237,13 +237,13 @@ describe("reducer nested undefined handling", () => {
       author: "test",
     });
     const content = next.items.get("m1")!.content;
-    // top-level undefined stripped — 'a' is NOT overwritten
-    expect(content.a).toBe(1);
+    // setting a to undefined removes it
+    expect("a" in content).toBe(false);
     expect(content.b).toBe(2);
     expect(content.c).toBe(3);
   });
 
-  it("strips top-level undefined in meta", () => {
+  it("setting meta key to undefined removes it", () => {
     const state = stateWith([
       makeItem("m1", { meta: { agent_id: "agent:x", session_id: "s1" } }),
     ]);
@@ -254,7 +254,7 @@ describe("reducer nested undefined handling", () => {
       author: "test",
     });
     const meta = next.items.get("m1")!.meta!;
-    expect(meta.agent_id).toBe("agent:x"); // not overwritten
+    expect("agent_id" in meta).toBe(false); // removed
     expect(meta.session_id).toBe("s1");
     expect(meta.tag).toBe("new");
   });

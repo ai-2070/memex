@@ -472,7 +472,8 @@ const { memState: updated, report } = importSlice(
   subAgentSlice,
 );
 // report.created -> what the sub-agent added
-// existing items untouched (append-only)
+// report.updated -> what was merged into existing items
+// existing items untouched by default (append-only)
 ```
 
 ### Crew patterns
