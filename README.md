@@ -1,4 +1,4 @@
-# @ai2070/memex
+# MemEX — Structured Memory for AI agents
 
 Multi-session continuity for AI systems.
 
