@@ -1,0 +1,23 @@
+API.md
+  be6478c53374c734 1045,1090
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "987991f07d316a4d702ceb1003b9ccdb57f8eba5",
+  "prompts": {
+    "be6478c53374c734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea560e81-bb13-499f-b444-0e6030ed09c5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 2,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
