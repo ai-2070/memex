@@ -14,7 +14,7 @@ Every chat session starts from scratch. Memory systems try to fix this by append
 - **Whether** it's still relevant (decay)
 - **Where** it came from (source attribution)
 
-The result: agents that can retrieve old text but can't reason about what they know.
+Most systems conflate "I can retrieve it" with "I know it." Retrieval is not memory. MemEX separates recall (a tool problem) from belief state (a knowledge problem).
 
 ## What MemEX Does
 
@@ -77,7 +77,7 @@ MemEX is the structured memory layer in a larger stack. It doesn't replace your 
 
 **Event store** -- the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
 
-MemEX is the system of record. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
+MemEX is the system of record. It does not replace retrieval systems -- it governs them. Vector search and keyword search are recall tools; MemEX is the epistemic coordination layer that decides what matters, what conflicts, and what to include in context. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
 
 ### What changes in agent behavior
 
@@ -257,6 +257,24 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 
 `applyCommand` never mutates input state. It returns a new `GraphState` and an array of lifecycle events. History is in the append-only event log; `GraphState` is always the latest snapshot.
 
+## Design Philosophy
+
+Every system encodes assumptions about truth, knowledge, and time -- whether it acknowledges them or not. MemEX makes those assumptions explicit.
+
+| Question | Typical system | MemEX |
+|----------|---------------|-------|
+| What is knowledge? | Similar text (vectors) or structured facts (SQL) | Beliefs with provenance, confidence, and conflict |
+| What exists? | Documents, rows | Observations, hypotheses, derivations, policies, traits |
+| Is truth binary? | Yes (stored or not) | No -- graded by authority, conviction, and importance |
+| Does knowledge decay? | No (or manually pruned) | Yes -- query-time decay, configurable per retrieval |
+| What about contradictions? | Overwrite or ignore | Represent, carry, and optionally resolve |
+
+Most memory systems compress and resolve -- they produce a single clean narrative. MemEX preserves and represents -- it maintains a field of competing claims that a reasoning layer can interpret. The graph is the pre-answer belief state, not the final answer.
+
+This is a deliberate architectural choice. MemEX is not a thinking system. It is a substrate that makes thinking systems possible. Storage, search, and cognition belong above the library. MemEX provides the structured epistemic state they operate on.
+
+Vector search tells you what is similar. MemEX tells you what you believe.
+
 ## Three Graphs
 
 MemEX contains three logical graphs in one package. Use what you need:
@@ -351,6 +369,17 @@ Think of the three graphs as a cognitive vector:
 Transferring cognition between agents is transferring this vector. The receiving agent starts from the same origin (memory), pursues the same goals with the same energy (intent), and avoids the same dead ends (task history).
 
 This is what `exportSlice` / `importSlice` enables at the library level. The transport layer (network, bus, file) is outside the library; MemEX provides the serializable structure.
+
+### What transplant enables
+
+| Pattern | How it works |
+|---------|-------------|
+| **Safe delegation** | Export a slice to a sub-agent. It operates on its own copy. Merge results back append-only -- no risk of corrupting the main graph. |
+| **Parallel reasoning** | Fork belief state into multiple slices. Run different reasoning paths independently. Compare outcomes before merging. |
+| **Reproducibility** | Event logs + deterministic slices mean any state can be replayed, audited, or debugged after the fact. |
+| **State mobility** | Memory is not tied to one runtime. Export, serialize, move between agents or machines, rehydrate anywhere. |
+
+Memory is no longer a local resource. It is portable belief.
 
 ## Features
 
