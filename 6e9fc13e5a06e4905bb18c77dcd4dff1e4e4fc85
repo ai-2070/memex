@@ -1,0 +1,31 @@
+src/integrity.ts
+  9b0fd1b59abf21ad 83-85,93,97-105,108
+src/task.ts
+  9b0fd1b59abf21ad 133-143,176
+src/intent.ts
+  9b0fd1b59abf21ad 126-136,199
+tests/bugfix-holes.test.ts
+  9b0fd1b59abf21ad 1-856
+src/transplant.ts
+  9b0fd1b59abf21ad 347-349,353-378,380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "6e9fc13e5a06e4905bb18c77dcd4dff1e4e4fc85",
+  "prompts": {
+    "9b0fd1b59abf21ad": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b1a6dbf7-e480-441c-9b46-c17a00c23c72",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 932,
+      "total_deletions": 26,
+      "accepted_lines": 928,
+      "overriden_lines": 0
+    }
+  }
+}
