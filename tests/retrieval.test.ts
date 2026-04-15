@@ -395,6 +395,18 @@ describe("extractTimestamp", () => {
     expect(Math.abs(ts - now)).toBeLessThan(1000);
   });
 
+  it("throws for non-UUIDv7 id", () => {
+    expect(() => extractTimestamp("not-a-uuid")).toThrow(
+      "not a valid UUIDv7",
+    );
+  });
+
+  it("throws for custom id without UUIDv7 format", () => {
+    expect(() => extractTimestamp("custom-id-12345")).toThrow(
+      "not a valid UUIDv7",
+    );
+  });
+
   it("preserves ordering between items created sequentially", () => {
     const item1 = createMemoryItem({
       scope: "test",

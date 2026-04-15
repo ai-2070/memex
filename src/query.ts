@@ -144,13 +144,34 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
  * Extract millisecond timestamp from a uuidv7 id.
  * uuidv7 encodes unix ms in the first 48 bits.
  */
+/**
+ * Try to extract a millisecond timestamp from a UUIDv7 id.
+ * Returns null for non-UUIDv7 ids.
+ */
+function safeExtractTimestamp(id: string): number | null {
+  const stripped = id.replace(/-/g, "");
+  if (stripped.length < 16 || stripped[12] !== "7") return null;
+  const ts = parseInt(stripped.slice(0, 12), 16);
+  if (isNaN(ts) || ts <= 0) return null;
+  return ts;
+}
+
+/**
+ * Extract millisecond timestamp from a uuidv7 id.
+ * Throws if the id is not a valid UUIDv7.
+ */
 export function extractTimestamp(uuidv7Id: string): number {
-  const hex = uuidv7Id.replace(/-/g, "").slice(0, 12);
-  return parseInt(hex, 16);
+  const ts = safeExtractTimestamp(uuidv7Id);
+  if (ts === null) {
+    throw new Error(
+      `Cannot extract timestamp: "${uuidv7Id}" is not a valid UUIDv7`,
+    );
+  }
+  return ts;
 }
 
 function itemTimestamp(item: MemoryItem): number {
-  return item.created_at ?? extractTimestamp(item.id);
+  return item.created_at ?? safeExtractTimestamp(item.id) ?? Date.now();
 }
 
 function getSortValue(item: MemoryItem, field: SortField): number {
@@ -233,6 +254,10 @@ function computeDecayMultiplier(
       return Math.max(0, 1 - decay.rate * intervals);
     case "step":
       return Math.pow(1 - decay.rate, Math.floor(intervals));
+    default:
+      throw new RangeError(
+        `Unknown decay type: "${decay.type}". Expected "exponential", "linear", or "step".`,
+      );
   }
 }
 

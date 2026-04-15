@@ -334,7 +334,10 @@ describe("smartRetrieve — surface + diversity pipeline", () => {
 
 describe("decay interval validation", () => {
   it("throws RangeError for unknown decay interval", () => {
-    const m1 = makeItem("m1", { authority: 0.5 });
+    const m1 = makeItem("m1", {
+      authority: 0.5,
+      created_at: Date.now() - 86_400_000,
+    });
     const state = stateWith([m1]);
 
     expect(() =>
@@ -350,7 +353,10 @@ describe("decay interval validation", () => {
   });
 
   it("throws with descriptive message for unknown interval", () => {
-    const m1 = makeItem("m1", { authority: 0.5 });
+    const m1 = makeItem("m1", {
+      authority: 0.5,
+      created_at: Date.now() - 86_400_000,
+    });
     const state = stateWith([m1]);
 
     expect(() =>
@@ -575,11 +581,10 @@ describe("cloneGraphState — shallow clone", () => {
 // ============================================================
 
 describe("extractTimestamp — edge cases", () => {
-  it("returns NaN for non-uuidv7 formatted id", () => {
-    const ts = extractTimestamp("not-a-uuid");
-    // "nota-uuid" after removing hyphens -> "notauuid", first 12 chars
-    // parseInt of non-hex string = NaN
-    expect(Number.isNaN(ts)).toBe(true);
+  it("throws for non-uuidv7 formatted id", () => {
+    expect(() => extractTimestamp("not-a-uuid")).toThrow(
+      "not a valid UUIDv7",
+    );
   });
 
   it("extracts valid timestamp from real uuidv7", () => {

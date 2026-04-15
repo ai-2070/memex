@@ -29,9 +29,15 @@ function uuidFromMs(ms: number): string {
 
 /**
  * Generate a new id 1ms after the original, incrementing until no collision.
+ * Accepts an optional created_at timestamp to use when the id is not a valid UUIDv7.
  */
-function reIdFor(originalId: string, existingIds: Set<string>): string {
-  let ms = extractTimestamp(originalId) + 1;
+function reIdFor(
+  originalId: string,
+  existingIds: Set<string>,
+  createdAt?: number,
+): string {
+  let ms = createdAt ?? extractTimestamp(originalId);
+  ms += 1;
   let newId = uuidFromMs(ms);
   while (existingIds.has(newId)) {
     ms++;
@@ -323,7 +329,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, item as any)) {
           if (doReId) {
-            const newId = reIdFor(item.id, allMemIds);
+            const newId = reIdFor(item.id, allMemIds, item.created_at);
             allMemIds.add(newId);
             memIdMap.set(item.id, newId);
             const remapped: MemoryItem = {
