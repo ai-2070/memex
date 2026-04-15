@@ -1,0 +1,29 @@
+src/query.ts
+  78fadf25ee76bcc1 147-162,164-170,174,257-260
+src/transplant.ts
+  78fadf25ee76bcc1 32,34-40,332
+tests/bugfix-and-coverage.test.ts
+  78fadf25ee76bcc1 337-340,356-359,584-587
+tests/retrieval.test.ts
+  78fadf25ee76bcc1 398-409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "ecc55731eee30057a3a7a81b8f30d82a03aaf5fe",
+  "prompts": {
+    "78fadf25ee76bcc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3916d885-9680-4d73-9754-5e961588797e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 86,
+      "total_deletions": 33,
+      "accepted_lines": 62,
+      "overriden_lines": 0
+    }
+  }
+}
