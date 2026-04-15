@@ -215,6 +215,94 @@ describe("memory.retract", () => {
   });
 });
 
+describe("memory.retract — orphan edge cleanup", () => {
+  it("removes edges where retracted item is 'from'", () => {
+    let state = stateWith(
+      [makeItem({ id: "m1" }), makeItem({ id: "m2" })],
+      [makeEdge({ edge_id: "e1", from: "m1", to: "m2" })],
+    );
+    const { state: next } = applyCommand(state, {
+      type: "memory.retract",
+      item_id: "m1",
+      author: "test",
+    });
+    expect(next.edges.size).toBe(0);
+  });
+
+  it("removes edges where retracted item is 'to'", () => {
+    let state = stateWith(
+      [makeItem({ id: "m1" }), makeItem({ id: "m2" })],
+      [makeEdge({ edge_id: "e1", from: "m2", to: "m1" })],
+    );
+    const { state: next } = applyCommand(state, {
+      type: "memory.retract",
+      item_id: "m1",
+      author: "test",
+    });
+    expect(next.edges.size).toBe(0);
+  });
+
+  it("emits edge.retracted events for cleaned-up edges", () => {
+    let state = stateWith(
+      [makeItem({ id: "m1" }), makeItem({ id: "m2" })],
+      [makeEdge({ edge_id: "e1", from: "m1", to: "m2" })],
+    );
+    const { events } = applyCommand(state, {
+      type: "memory.retract",
+      item_id: "m1",
+      author: "test",
+    });
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe("memory.retracted");
+    expect(events[1].type).toBe("edge.retracted");
+    expect(events[1].edge!.edge_id).toBe("e1");
+  });
+
+  it("does not remove edges unrelated to retracted item", () => {
+    let state = stateWith(
+      [
+        makeItem({ id: "m1" }),
+        makeItem({ id: "m2" }),
+        makeItem({ id: "m3" }),
+      ],
+      [makeEdge({ edge_id: "e1", from: "m2", to: "m3" })],
+    );
+    const { state: next } = applyCommand(state, {
+      type: "memory.retract",
+      item_id: "m1",
+      author: "test",
+    });
+    expect(next.edges.size).toBe(1);
+    expect(next.edges.has("e1")).toBe(true);
+  });
+});
+
+describe("memory.update — undefined content/meta preservation", () => {
+  it("does not delete content keys when patch value is undefined", () => {
+    const state = stateWith([makeItem()]);
+    const { state: next } = applyCommand(state, {
+      type: "memory.update",
+      item_id: "m1",
+      partial: { content: { key: undefined } as any },
+      author: "test",
+    });
+    expect(next.items.get("m1")!.content.key).toBe("value");
+  });
+
+  it("does not delete meta keys when patch value is undefined", () => {
+    const state = stateWith([
+      makeItem({ meta: { agent_id: "agent:x", session_id: "s1" } }),
+    ]);
+    const { state: next } = applyCommand(state, {
+      type: "memory.update",
+      item_id: "m1",
+      partial: { meta: { agent_id: undefined } as any },
+      author: "test",
+    });
+    expect(next.items.get("m1")!.meta!.agent_id).toBe("agent:x");
+  });
+});
+
 describe("edge.create", () => {
   it("creates an edge", () => {
     const edge = makeEdge();
@@ -316,7 +404,7 @@ describe("sequential operations", () => {
     expect(allEvents).toHaveLength(3);
   });
 
-  it("two items + edge; retract one; edge and other item remain", () => {
+  it("two items + edge; retract one; orphaned edge is removed", () => {
     let state: GraphState = createGraphState();
     state = applyCommand(state, {
       type: "memory.create",
@@ -337,6 +425,6 @@ describe("sequential operations", () => {
     }).state;
     expect(state.items.size).toBe(1);
     expect(state.items.has("m2")).toBe(true);
-    expect(state.edges.size).toBe(1);
+    expect(state.edges.size).toBe(0);
   });
 });

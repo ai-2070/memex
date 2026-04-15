@@ -163,6 +163,33 @@ describe("exportSlice", () => {
     expect(slice.tasks).toHaveLength(1);
   });
 
+  it("exports aliases in reverse direction (to → from)", () => {
+    let mem = createGraphState();
+    mem = applyCommand(mem, {
+      type: "memory.create",
+      item: makeItem("m1"),
+    }).state;
+    mem = applyCommand(mem, {
+      type: "memory.create",
+      item: makeItem("m2"),
+    }).state;
+    // alias edge: from=m2, to=m1 (reverse direction)
+    mem = applyCommand(mem, {
+      type: "edge.create",
+      edge: makeEdge("e-alias", "m2", "m1", "ALIAS"),
+    }).state;
+
+    const slice = exportSlice(mem, createIntentState(), createTaskState(), {
+      memory_ids: ["m1"],
+      include_aliases: true,
+    });
+
+    const ids = slice.memories.map((m) => m.id).sort();
+    expect(ids).toEqual(["m1", "m2"]);
+    expect(slice.edges).toHaveLength(1);
+    expect(slice.edges[0].edge_id).toBe("e-alias");
+  });
+
   it("empty export returns empty slice", () => {
     const { mem, intents, tasks } = buildState();
     const slice = exportSlice(mem, intents, tasks, {});

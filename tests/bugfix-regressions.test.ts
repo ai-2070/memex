@@ -58,37 +58,41 @@ function toScored(items: MemoryItem[], scores: number[]): ScoredItem[] {
 // Bug 4: stripUndefined on content/meta merge
 // ============================================================
 
-describe("Bug 4: setting content/meta keys to undefined removes them", () => {
-  it("removes a content key when set to undefined", () => {
+describe("Bug 4: setting content/meta keys to undefined preserves them", () => {
+  it("preserves a content key when set to undefined", () => {
     const existing = makeItem("m1", {
       content: { a: 1, b: 2, c: 3 },
     });
     const merged = mergeItem(existing, {
       content: { a: undefined },
     });
-    expect(merged.content).toEqual({ b: 2, c: 3 });
-    expect("a" in merged.content).toBe(false);
+    expect(merged.content).toEqual({ a: 1, b: 2, c: 3 });
+    expect(merged.content.a).toBe(1);
   });
 
-  it("removes a meta key when set to undefined", () => {
+  it("preserves a meta key when set to undefined", () => {
     const existing = makeItem("m1", {
       meta: { agent_id: "agent:x", session_id: "s1", custom: "val" },
     });
     const merged = mergeItem(existing, {
       meta: { custom: undefined },
     });
-    expect(merged.meta).toEqual({ agent_id: "agent:x", session_id: "s1" });
-    expect("custom" in merged.meta!).toBe(false);
+    expect(merged.meta).toEqual({
+      agent_id: "agent:x",
+      session_id: "s1",
+      custom: "val",
+    });
+    expect(merged.meta!.custom).toBe("val");
   });
 
-  it("keeps other content keys intact when removing one", () => {
+  it("keeps all content keys intact when patch has undefined", () => {
     const existing = makeItem("m1", {
       content: { x: 10, y: 20 },
     });
     const merged = mergeItem(existing, {
       content: { x: undefined, z: 30 },
     });
-    expect(merged.content).toEqual({ y: 20, z: 30 });
+    expect(merged.content).toEqual({ x: 10, y: 20, z: 30 });
   });
 
   it("works through applyCommand memory.update", () => {
@@ -106,8 +110,8 @@ describe("Bug 4: setting content/meta keys to undefined removes them", () => {
     }).state;
 
     const item = state.items.get("m1")!;
-    expect(item.content).toEqual({ keep: 1 });
-    expect("remove" in item.content).toBe(false);
+    expect(item.content).toEqual({ keep: 1, remove: 2 });
+    expect(item.content.remove).toBe(2);
   });
 });
 

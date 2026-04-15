@@ -96,6 +96,30 @@ describe("createEdge", () => {
   it("throws RangeError for authority out of range", () => {
     expect(() => createEdge({ ...base, authority: 1.01 })).toThrow(RangeError);
   });
+
+  it("throws RangeError for weight > 1", () => {
+    expect(() => createEdge({ ...base, weight: 1.5 })).toThrow(RangeError);
+  });
+
+  it("throws RangeError for weight < 0", () => {
+    expect(() => createEdge({ ...base, weight: -0.1 })).toThrow(RangeError);
+  });
+
+  it("accepts undefined weight", () => {
+    const edge = createEdge(base);
+    expect(edge.weight).toBeUndefined();
+  });
+
+  it("accepts valid weight in range [0, 1]", () => {
+    const edge = createEdge({ ...base, weight: 0.5 });
+    expect(edge.weight).toBe(0.5);
+  });
+
+  it("throws Error when from equals to (self-referencing edge)", () => {
+    expect(() => createEdge({ ...base, from: "m1", to: "m1" })).toThrow(
+      "Self-referencing edge not allowed",
+    );
+  });
 });
 
 describe("createEventEnvelope", () => {
