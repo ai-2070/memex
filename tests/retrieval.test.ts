@@ -702,6 +702,17 @@ describe("smartRetrieve", () => {
     ).toThrow(RangeError);
   });
 
+  it("throws RangeError when costFn returns NaN", () => {
+    const state = stateWith([makeItem("m1", { authority: 0.9 })]);
+    expect(() =>
+      smartRetrieve(state, {
+        budget: 100,
+        costFn: () => NaN,
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
+  });
+
   it("full pipeline: filter + contradictions + diversity + budget", () => {
     const state = stateWith([
       makeItem("m1", { scope: "a", author: "agent:x", authority: 0.9 }),
