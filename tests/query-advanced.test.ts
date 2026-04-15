@@ -187,11 +187,12 @@ describe("parents filter (advanced)", () => {
 // ============================================================
 
 describe("multi-sort", () => {
+  const now = Date.now();
   const state = stateWith([
-    makeItem("m1", { authority: 0.5, importance: 0.9 }),
-    makeItem("m2", { authority: 0.5, importance: 0.3 }),
-    makeItem("m3", { authority: 0.9, importance: 0.1 }),
-    makeItem("m4", { authority: 0.5, importance: 0.6 }),
+    makeItem("m1", { authority: 0.5, importance: 0.9, created_at: now - 30 }),
+    makeItem("m2", { authority: 0.5, importance: 0.3, created_at: now - 20 }),
+    makeItem("m3", { authority: 0.9, importance: 0.1, created_at: now - 10 }),
+    makeItem("m4", { authority: 0.5, importance: 0.6, created_at: now }),
   ]);
 
   it("single sort still works (backwards compat)", () => {
