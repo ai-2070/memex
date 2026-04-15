@@ -1,0 +1,25 @@
+tests/integrity.test.ts
+  78fadf25ee76bcc1 371-392
+src/integrity.ts
+  78fadf25ee76bcc1 370-372
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "8418069f266d6a76fad410abf47688a2303742ef",
+  "prompts": {
+    "78fadf25ee76bcc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3916d885-9680-4d73-9754-5e961588797e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 0,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}
