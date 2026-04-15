@@ -1,0 +1,25 @@
+src/query.ts
+  78fadf25ee76bcc1 174-180
+tests/query-advanced.test.ts
+  78fadf25ee76bcc1 190,192-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "82486a6f439b8ede100c8dc01e4a128d1270e0f2",
+  "prompts": {
+    "78fadf25ee76bcc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3916d885-9680-4d73-9754-5e961588797e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 5,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
