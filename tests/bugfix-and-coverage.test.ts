@@ -774,23 +774,23 @@ describe("applyDiversity — mixed parents", () => {
 // ============================================================
 
 describe("mergeItem — edge cases", () => {
-  it("setting content key to undefined removes it", () => {
+  it("setting content key to undefined preserves it", () => {
     const existing = makeItem("m1", { content: { a: 1, b: 2 } });
     const merged = mergeItem(existing, {
       content: { a: undefined, c: 3 } as any,
     });
-    // a should be removed (set to undefined), b preserved, c added
-    expect("a" in merged.content).toBe(false);
+    // a should be preserved (undefined means no change), b preserved, c added
+    expect(merged.content.a).toBe(1);
     expect(merged.content.b).toBe(2);
     expect(merged.content.c).toBe(3);
   });
 
-  it("setting meta key to undefined removes it", () => {
+  it("setting meta key to undefined preserves it", () => {
     const existing = makeItem("m1", { meta: { agent_id: "bot", x: 1 } });
     const merged = mergeItem(existing, {
       meta: { agent_id: undefined, y: 2 } as any,
     });
-    expect("agent_id" in merged.meta!).toBe(false);
+    expect(merged.meta!.agent_id).toBe("bot");
     expect(merged.meta!.x).toBe(1);
     expect(merged.meta!.y).toBe(2);
   });

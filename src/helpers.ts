@@ -40,7 +40,13 @@ export function createEdge(
     active?: boolean;
   },
 ): Edge {
+  if (input.from === input.to) {
+    throw new Error(
+      `Self-referencing edge not allowed: from and to are both "${input.from}"`,
+    );
+  }
   validateScore(input.authority, "authority");
+  validateScore(input.weight, "weight");
 
   return {
     ...input,

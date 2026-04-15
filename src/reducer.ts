@@ -46,11 +46,17 @@ export function mergeItem(
     ...stripUndefined(rest),
     content:
       partialContent !== undefined
-        ? mergeAndPrune(existing.content, partialContent)
+        ? mergeAndPrune(
+            existing.content,
+            stripUndefined(partialContent) as Record<string, unknown>,
+          )
         : existing.content,
     meta:
       partialMeta !== undefined
-        ? mergeAndPrune(existing.meta ?? {}, partialMeta)
+        ? mergeAndPrune(
+            existing.meta ?? {},
+            stripUndefined(partialMeta) as Record<string, unknown>,
+          )
         : existing.meta,
   };
 }
@@ -112,17 +118,27 @@ export function applyCommand(
       }
       const items = new Map(state.items);
       items.delete(cmd.item_id);
-      return {
-        state: { items, edges: state.edges },
-        events: [
-          {
+      const edges = new Map(state.edges);
+      const events: MemoryLifecycleEvent[] = [
+        {
+          namespace: "memory",
+          type: "memory.retracted",
+          item: existing,
+          cause_type: cmd.type,
+        },
+      ];
+      for (const [edgeId, edge] of state.edges) {
+        if (edge.from === cmd.item_id || edge.to === cmd.item_id) {
+          edges.delete(edgeId);
+          events.push({
             namespace: "memory",
-            type: "memory.retracted",
-            item: existing,
+            type: "edge.retracted",
+            edge,
             cause_type: cmd.type,
-          },
-        ],
-      };
+          });
+        }
+      }
+      return { state: { items, edges }, events };
     }
 
     case "edge.create": {

@@ -114,16 +114,28 @@ export function exportSlice(
       const id = queue.pop()!;
       if (visited.has(id)) continue;
       visited.add(id);
-      const aliasEdges = getEdges(memState, {
+      const forwardAliases = getEdges(memState, {
         from: id,
         kind: "ALIAS",
         active_only: true,
       });
-      for (const edge of aliasEdges) {
+      for (const edge of forwardAliases) {
         edgeIds.add(edge.edge_id);
         if (!memoryIds.has(edge.to)) {
           memoryIds.add(edge.to);
           queue.push(edge.to);
+        }
+      }
+      const reverseAliases = getEdges(memState, {
+        to: id,
+        kind: "ALIAS",
+        active_only: true,
+      });
+      for (const edge of reverseAliases) {
+        edgeIds.add(edge.edge_id);
+        if (!memoryIds.has(edge.from)) {
+          memoryIds.add(edge.from);
+          queue.push(edge.from);
         }
       }
     }

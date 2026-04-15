@@ -668,6 +668,28 @@ describe("smartRetrieve", () => {
     expect(result[1].item.id).toBe("m3");
   });
 
+  it("throws RangeError when costFn returns 0", () => {
+    const state = stateWith([makeItem("m1", { authority: 0.9 })]);
+    expect(() =>
+      smartRetrieve(state, {
+        budget: 100,
+        costFn: () => 0,
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("throws RangeError when costFn returns negative value", () => {
+    const state = stateWith([makeItem("m1", { authority: 0.9 })]);
+    expect(() =>
+      smartRetrieve(state, {
+        budget: 100,
+        costFn: () => -5,
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
+  });
+
   it("full pipeline: filter + contradictions + diversity + budget", () => {
     const state = stateWith([
       makeItem("m1", { scope: "a", author: "agent:x", authority: 0.9 }),
