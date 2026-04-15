@@ -14,6 +14,12 @@ import type { TaskState } from "../src/task.js";
 
 // -- helpers --
 
+/** Generate a deterministic UUIDv7-shaped id for testing. */
+function fakeUuid(n: number): string {
+  const ms = (1700000000000 + n).toString(16).padStart(12, "0");
+  return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
+}
+
 const makeItem = (
   id: string,
   overrides: Partial<MemoryItem> = {},
@@ -330,14 +336,15 @@ describe("importSlice (shallow compare + re-id)", () => {
   });
 
   it("re-ids on difference when enabled", () => {
+    const memId = fakeUuid(1);
     let targetMem = createGraphState();
     targetMem = applyCommand(targetMem, {
       type: "memory.create",
-      item: makeItem("m1", { authority: 0.99 }),
+      item: makeItem(memId, { authority: 0.99 }),
     }).state;
 
     const slice = {
-      memories: [makeItem("m1", { authority: 0.1 })],
+      memories: [makeItem(memId, { authority: 0.1 })],
       edges: [],
       intents: [],
       tasks: [],
@@ -352,10 +359,10 @@ describe("importSlice (shallow compare + re-id)", () => {
     );
 
     expect(result.memState.items.size).toBe(2); // original + re-id'd
-    expect(result.memState.items.get("m1")!.authority).toBe(0.99); // original untouched
+    expect(result.memState.items.get(memId)!.authority).toBe(0.99); // original untouched
     expect(result.report.created.memories).toHaveLength(1);
     const newId = result.report.created.memories[0];
-    expect(newId).not.toBe("m1");
+    expect(newId).not.toBe(memId);
     expect(result.memState.items.get(newId)!.authority).toBe(0.1);
   });
 });

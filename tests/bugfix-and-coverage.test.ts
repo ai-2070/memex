@@ -53,6 +53,12 @@ import type { TaskState, Task } from "../src/task.js";
 
 // -- helpers --
 
+/** Generate a deterministic UUIDv7-shaped id for testing. */
+function fakeUuid(n: number): string {
+  const ms = (1700000000000 + n).toString(16).padStart(12, "0");
+  return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
+}
+
 const makeItem = (
   id: string,
   overrides: Partial<MemoryItem> = {},
@@ -813,19 +819,21 @@ describe("mergeItem — edge cases", () => {
 
 describe("importSlice — re-id intents and tasks", () => {
   it("remaps intent root_memory_ids when memories are re-id'd", () => {
-    // set up existing state with m1
-    const mem = stateWith([makeItem("m1", { content: { old: true } })]);
+    const memId = fakeUuid(1);
+    const intentId = fakeUuid(2);
+    // set up existing state with memId
+    const mem = stateWith([makeItem(memId, { content: { old: true } })]);
     const intents = createIntentState();
     const tasks = createTaskState();
 
-    // slice has m1 (different content) and intent referencing m1
+    // slice has memId (different content) and intent referencing memId
     const slice = {
-      memories: [makeItem("m1", { content: { new: true } })],
+      memories: [makeItem(memId, { content: { new: true } })],
       edges: [],
       intents: [
         makeIntent({
-          id: "i1",
-          root_memory_ids: ["m1"],
+          id: intentId,
+          root_memory_ids: [memId],
         }),
       ],
       tasks: [],
@@ -840,34 +848,37 @@ describe("importSlice — re-id intents and tasks", () => {
     // memory should have been re-id'd
     expect(result.report.created.memories).toHaveLength(1);
     const newMemId = result.report.created.memories[0];
-    expect(newMemId).not.toBe("m1");
+    expect(newMemId).not.toBe(memId);
 
     // intent should reference the new memory id
     const importedIntent = result.report.created.intents[0];
     const intent = result.intentState.intents.get(importedIntent)!;
     expect(intent.root_memory_ids).toContain(newMemId);
-    expect(intent.root_memory_ids).not.toContain("m1");
+    expect(intent.root_memory_ids).not.toContain(memId);
   });
 
   it("remaps task memory ids when memories are re-id'd", () => {
-    const mem = stateWith([makeItem("m1", { content: { old: true } })]);
+    const memId = fakeUuid(1);
+    const intentId = fakeUuid(2);
+    const taskId = fakeUuid(3);
+    const mem = stateWith([makeItem(memId, { content: { old: true } })]);
     let intents = createIntentState();
     intents = applyIntentCommand(intents, {
       type: "intent.create",
-      intent: makeIntent({ id: "i1" }),
+      intent: makeIntent({ id: intentId }),
     }).state;
     const tasks = createTaskState();
 
     const slice = {
-      memories: [makeItem("m1", { content: { new: true } })],
+      memories: [makeItem(memId, { content: { new: true } })],
       edges: [],
       intents: [],
       tasks: [
         makeTask({
-          id: "t1",
-          intent_id: "i1",
-          input_memory_ids: ["m1"],
-          output_memory_ids: ["m1"],
+          id: taskId,
+          intent_id: intentId,
+          input_memory_ids: [memId],
+          output_memory_ids: [memId],
         }),
       ],
     };

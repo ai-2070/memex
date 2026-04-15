@@ -41,6 +41,12 @@ import type { Task } from "../src/task.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Generate a deterministic UUIDv7-shaped id for testing. */
+function fakeUuid(n: number): string {
+  const ms = (1700000000000 + n).toString(16).padStart(12, "0");
+  return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
+}
+
 let counter = 0;
 
 function fakeId(tsMs: number): string {
@@ -197,12 +203,13 @@ describe("task.update strips undefined values", () => {
 
 describe("importSlice edge re-id on conflict", () => {
   it("re-ids edges when reIdOnDifference is true and edge data differs", () => {
+    const edgeId = fakeUuid(1);
     const memState = stateWith([makeItem("m1"), makeItem("m2")]);
     const intentState = createIntentState();
     const taskState = createTaskState();
 
     // add an edge to the existing state
-    const existingEdge = makeEdge("e1", "m1", "m2", "SUPPORTS", { weight: 0.5 });
+    const existingEdge = makeEdge(edgeId, "m1", "m2", "SUPPORTS", { weight: 0.5 });
     const stateWithEdge = applyCommand(memState, {
       type: "edge.create",
       edge: existingEdge,
@@ -211,7 +218,7 @@ describe("importSlice edge re-id on conflict", () => {
     // slice with same edge_id but different data
     const slice = {
       memories: [],
-      edges: [makeEdge("e1", "m1", "m2", "SUPPORTS", { weight: 0.9 })],
+      edges: [makeEdge(edgeId, "m1", "m2", "SUPPORTS", { weight: 0.9 })],
       intents: [],
       tasks: [],
     };
@@ -223,11 +230,11 @@ describe("importSlice edge re-id on conflict", () => {
     });
 
     // original edge should still exist
-    expect(result.memState.edges.has("e1")).toBe(true);
+    expect(result.memState.edges.has(edgeId)).toBe(true);
     // a new edge should have been created
     expect(result.report.created.edges.length).toBe(1);
     const newEdgeId = result.report.created.edges[0];
-    expect(newEdgeId).not.toBe("e1");
+    expect(newEdgeId).not.toBe(edgeId);
     const newEdge = result.memState.edges.get(newEdgeId)!;
     expect(newEdge.weight).toBe(0.9);
     expect(newEdge.from).toBe("m1");
@@ -501,13 +508,13 @@ describe("getItemsByBudget with zero-cost items", () => {
       makeItem("m3", { authority: 0.7 }),
     ]);
 
-    const result = getItemsByBudget(state, {
-      budget: 5,
-      costFn: () => 0,
-      weights: { authority: 1 },
-    });
-
-    expect(result.length).toBe(3);
+    expect(() =>
+      getItemsByBudget(state, {
+        budget: 5,
+        costFn: () => 0,
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
   });
 
   it("mixes zero-cost and positive-cost items correctly", () => {
@@ -517,17 +524,13 @@ describe("getItemsByBudget with zero-cost items", () => {
       makeItem("m3", { authority: 0.7 }),
     ]);
 
-    const result = getItemsByBudget(state, {
-      budget: 2,
-      costFn: (item) => (item.id === "m2" ? 0 : 1),
-      weights: { authority: 1 },
-    });
-
-    const ids = result.map((s) => s.item.id);
-    // m1 (score 0.9, cost 1) → remaining 1; m2 (score 0.8, cost 0) → remaining 1; m3 (cost 1) → remaining 0
-    expect(ids).toContain("m1");
-    expect(ids).toContain("m2");
-    expect(ids).toContain("m3");
+    expect(() =>
+      getItemsByBudget(state, {
+        budget: 2,
+        costFn: (item) => (item.id === "m2" ? 0 : 1),
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
   });
 });
 
