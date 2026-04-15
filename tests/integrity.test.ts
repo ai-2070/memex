@@ -390,4 +390,15 @@ describe("getItemsByBudget", () => {
       }),
     ).toThrow(RangeError);
   });
+
+  it("throws RangeError when costFn returns NaN", () => {
+    const state = stateWith([makeItem("m1", { authority: 0.9 })]);
+    expect(() =>
+      getItemsByBudget(state, {
+        budget: 100,
+        costFn: () => NaN,
+        weights: { authority: 1 },
+      }),
+    ).toThrow(RangeError);
+  });
 });
