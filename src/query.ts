@@ -171,7 +171,13 @@ export function extractTimestamp(uuidv7Id: string): number {
 }
 
 function itemTimestamp(item: MemoryItem): number {
-  return item.created_at ?? safeExtractTimestamp(item.id) ?? Date.now();
+  const ts = item.created_at ?? safeExtractTimestamp(item.id);
+  if (ts === null || ts === undefined) {
+    throw new Error(
+      `Cannot determine timestamp for item "${item.id}": set created_at or use a UUIDv7 id`,
+    );
+  }
+  return ts;
 }
 
 function getSortValue(item: MemoryItem, field: SortField): number {
