@@ -20,6 +20,12 @@ import type { TaskState } from "../src/task.js";
 
 // -- helpers --
 
+/** Generate a deterministic UUIDv7-shaped id for testing. */
+function fakeUuid(n: number): string {
+  const ms = (1700000000000 + n).toString(16).padStart(12, "0");
+  return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
+}
+
 const makeItem = (
   id: string,
   overrides: Partial<MemoryItem> = {},
@@ -429,25 +435,27 @@ describe("Bug 2: skipExistingIds: false updates instead of crashing", () => {
 
 describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
   it("remaps memory intent_id when intent is re-id'd", () => {
-    // Target already has a different intent "i1"
+    const intentId = fakeUuid(1);
+    const memId = fakeUuid(2);
+    // Target already has a different intent
     let targetIntents = createIntentState();
     targetIntents = applyIntentCommand(targetIntents, {
       type: "intent.create",
       intent: createIntent({
-        id: "i1",
+        id: intentId,
         label: "existing_intent",
         priority: 0.5,
         owner: "user:laz",
       }),
     }).state;
 
-    // Slice has a memory referencing intent "i1" and a different intent "i1"
+    // Slice has a memory referencing the intent and a different intent with same id
     const slice = {
-      memories: [makeItem("m1", { intent_id: "i1" })],
+      memories: [makeItem(memId, { intent_id: intentId })],
       edges: [],
       intents: [
         createIntent({
-          id: "i1",
+          id: intentId,
           label: "imported_intent",
           priority: 0.9,
           owner: "user:laz",
@@ -467,21 +475,24 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
     // The intent should have been re-id'd
     expect(result.report.created.intents).toHaveLength(1);
     const newIntentId = result.report.created.intents[0];
-    expect(newIntentId).not.toBe("i1");
+    expect(newIntentId).not.toBe(intentId);
 
     // The memory's intent_id should now point to the new intent id
-    const mem = result.memState.items.get("m1")!;
+    const mem = result.memState.items.get(memId)!;
     expect(mem.intent_id).toBe(newIntentId);
   });
 
   it("remaps memory task_id when task is re-id'd", () => {
-    // Target already has a different task "t1"
+    const taskId = fakeUuid(1);
+    const intentId = fakeUuid(2);
+    const memId = fakeUuid(3);
+    // Target already has a different task
     let targetTasks = createTaskState();
     targetTasks = applyTaskCommand(targetTasks, {
       type: "task.create",
       task: createTask({
-        id: "t1",
-        intent_id: "i1",
+        id: taskId,
+        intent_id: intentId,
         action: "existing_action",
         priority: 0.5,
       }),
@@ -491,7 +502,7 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
     targetIntents = applyIntentCommand(targetIntents, {
       type: "intent.create",
       intent: createIntent({
-        id: "i1",
+        id: intentId,
         label: "intent",
         priority: 0.5,
         owner: "user:laz",
@@ -499,13 +510,13 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
     }).state;
 
     const slice = {
-      memories: [makeItem("m1", { task_id: "t1" })],
+      memories: [makeItem(memId, { task_id: taskId })],
       edges: [],
       intents: [],
       tasks: [
         createTask({
-          id: "t1",
-          intent_id: "i1",
+          id: taskId,
+          intent_id: intentId,
           action: "imported_action",
           priority: 0.9,
         }),
@@ -523,19 +534,22 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
     // The task should have been re-id'd
     expect(result.report.created.tasks).toHaveLength(1);
     const newTaskId = result.report.created.tasks[0];
-    expect(newTaskId).not.toBe("t1");
+    expect(newTaskId).not.toBe(taskId);
 
     // The memory's task_id should now point to the new task id
-    const mem = result.memState.items.get("m1")!;
+    const mem = result.memState.items.get(memId)!;
     expect(mem.task_id).toBe(newTaskId);
   });
 
   it("remaps both intent_id and task_id when both are re-id'd", () => {
+    const intentId = fakeUuid(1);
+    const taskId = fakeUuid(2);
+    const memId = fakeUuid(3);
     let targetIntents = createIntentState();
     targetIntents = applyIntentCommand(targetIntents, {
       type: "intent.create",
       intent: createIntent({
-        id: "i1",
+        id: intentId,
         label: "existing",
         priority: 0.1,
         owner: "user:laz",
@@ -546,19 +560,19 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
     targetTasks = applyTaskCommand(targetTasks, {
       type: "task.create",
       task: createTask({
-        id: "t1",
-        intent_id: "i1",
+        id: taskId,
+        intent_id: intentId,
         action: "existing",
         priority: 0.1,
       }),
     }).state;
 
     const slice = {
-      memories: [makeItem("m1", { intent_id: "i1", task_id: "t1" })],
+      memories: [makeItem(memId, { intent_id: intentId, task_id: taskId })],
       edges: [],
       intents: [
         createIntent({
-          id: "i1",
+          id: intentId,
           label: "imported",
           priority: 0.9,
           owner: "user:laz",
@@ -566,8 +580,8 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
       ],
       tasks: [
         createTask({
-          id: "t1",
-          intent_id: "i1",
+          id: taskId,
+          intent_id: intentId,
           action: "imported",
           priority: 0.9,
         }),
@@ -584,7 +598,7 @@ describe("Bug 1: importSlice remaps intent_id/task_id on memories", () => {
 
     const newIntentId = result.report.created.intents[0];
     const newTaskId = result.report.created.tasks[0];
-    const mem = result.memState.items.get("m1")!;
+    const mem = result.memState.items.get(memId)!;
 
     expect(mem.intent_id).toBe(newIntentId);
     expect(mem.task_id).toBe(newTaskId);

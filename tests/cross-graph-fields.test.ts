@@ -25,6 +25,12 @@ import type { MemoryItem, GraphState } from "../src/types.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Generate a deterministic UUIDv7-shaped id for testing. */
+function fakeUuid(n: number): string {
+  const ms = (1700000000000 + n).toString(16).padStart(12, "0");
+  return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
+}
+
 function makeItem(
   id: string,
   overrides: Partial<MemoryItem> = {},
@@ -273,13 +279,15 @@ describe("TaskFilter parent_id and is_root", () => {
 
 describe("transplant rewrites parent_id", () => {
   it("rewrites intent parent_id on re-id", () => {
+    const parentIntentId = fakeUuid(1);
+    const childIntentId = fakeUuid(2);
     const memState = createGraphState();
     let intentState = createIntentState();
     const taskState = createTaskState();
 
     // create parent intent in destination
     const existing = createIntent({
-      id: "i1",
+      id: parentIntentId,
       label: "existing",
       priority: 0.5,
       owner: "user:laz",
@@ -291,14 +299,14 @@ describe("transplant rewrites parent_id", () => {
 
     // slice has same id but different data, plus a child
     const sliceParent = createIntent({
-      id: "i1",
+      id: parentIntentId,
       label: "different",
       priority: 0.9,
       owner: "user:laz",
     });
     const sliceChild = createIntent({
-      id: "i2",
-      parent_id: "i1",
+      id: childIntentId,
+      parent_id: parentIntentId,
       label: "child",
       priority: 0.7,
       owner: "user:laz",
@@ -317,22 +325,25 @@ describe("transplant rewrites parent_id", () => {
 
     // parent got re-id'd
     const newParentId = result.report.created.intents[0];
-    expect(newParentId).not.toBe("i1");
+    expect(newParentId).not.toBe(parentIntentId);
 
     // child should reference the new parent id
-    const child = result.intentState.intents.get("i2")!;
+    const child = result.intentState.intents.get(childIntentId)!;
     expect(child.parent_id).toBe(newParentId);
   });
 
   it("rewrites task parent_id on re-id", () => {
+    const parentTaskId = fakeUuid(1);
+    const childTaskId = fakeUuid(2);
+    const intentId = fakeUuid(3);
     const memState = createGraphState();
     const intentState = createIntentState();
     let taskState = createTaskState();
 
     // create parent task in destination
     const existing = createTask({
-      id: "t1",
-      intent_id: "i1",
+      id: parentTaskId,
+      intent_id: intentId,
       action: "search",
       priority: 0.5,
     });
@@ -343,15 +354,15 @@ describe("transplant rewrites parent_id", () => {
 
     // slice has same id but different data, plus a child
     const sliceParent = createTask({
-      id: "t1",
-      intent_id: "i1",
+      id: parentTaskId,
+      intent_id: intentId,
       action: "different_search",
       priority: 0.9,
     });
     const sliceChild = createTask({
-      id: "t2",
-      intent_id: "i1",
-      parent_id: "t1",
+      id: childTaskId,
+      intent_id: intentId,
+      parent_id: parentTaskId,
       action: "parse",
       priority: 0.7,
     });
@@ -369,10 +380,10 @@ describe("transplant rewrites parent_id", () => {
 
     // parent got re-id'd
     const newParentId = result.report.created.tasks[0];
-    expect(newParentId).not.toBe("t1");
+    expect(newParentId).not.toBe(parentTaskId);
 
     // child should reference the new parent id
-    const child = result.taskState.tasks.get("t2")!;
+    const child = result.taskState.tasks.get(childTaskId)!;
     expect(child.parent_id).toBe(newParentId);
   });
 });
