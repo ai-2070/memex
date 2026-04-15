@@ -1,6 +1,6 @@
 {
   "name": "@ai2070/memex",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "MemEX memory layer — graph of memories and edges over an append-only event log",
   "type": "module",
   "main": "./dist/index.js",
