@@ -1,0 +1,23 @@
+src/schemas.ts
+  465d8d6680d7689d 1-543
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "1aa94d6342b319775716c38e8ac4f34129abda29",
+  "prompts": {
+    "465d8d6680d7689d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9469f364-b159-4e35-ae77-003f184e7bbd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 775,
+      "total_deletions": 168,
+      "accepted_lines": 555,
+      "overriden_lines": 1
+    }
+  }
+}
