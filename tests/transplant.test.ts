@@ -516,6 +516,68 @@ describe("regression: shallowEqual with nested objects", () => {
     expect(result.report.conflicts.memories).toHaveLength(0);
   });
 
+  it("treats objects with same keys in different insertion order as equal", () => {
+    const id = fakeUuid(12);
+
+    let targetMem = createGraphState();
+    // Keys inserted in order: a, b
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(id, { content: { a: 1, b: 2 } }),
+    }).state;
+
+    // Keys inserted in order: b, a (different insertion order, same data)
+    const reversed: Record<string, unknown> = {};
+    reversed["b"] = 2;
+    reversed["a"] = 1;
+
+    const slice = {
+      memories: [makeItem(id, { content: reversed })],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true },
+    );
+
+    expect(result.report.skipped.memories).toEqual([id]);
+    expect(result.report.conflicts.memories).toHaveLength(0);
+  });
+
+  it("treats arrays as equal when elements match", () => {
+    const id = fakeUuid(13);
+
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(id, { parents: ["p1", "p2"] }),
+    }).state;
+
+    const slice = {
+      memories: [makeItem(id, { parents: ["p1", "p2"] })],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true },
+    );
+
+    expect(result.report.skipped.memories).toEqual([id]);
+    expect(result.report.conflicts.memories).toHaveLength(0);
+  });
+
   it("detects actual content differences in nested objects", () => {
     const id = fakeUuid(11);
 

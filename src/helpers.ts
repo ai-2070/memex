@@ -1,5 +1,5 @@
 import { uuidv7 } from "uuidv7";
-import type { MemoryItem, Edge, EventEnvelope } from "./types.js";
+import type { MemoryItem, Edge, EventEnvelope, Namespace } from "./types.js";
 
 function validateScore(value: number | undefined, name: string): void {
   if (value !== undefined && (value < 0 || value > 1)) {
@@ -58,11 +58,11 @@ export function createEdge(
 export function createEventEnvelope<T>(
   type: string,
   payload: T,
-  opts?: { trace_id?: string },
+  opts?: { trace_id?: string; namespace?: Namespace },
 ): EventEnvelope<T> {
   return {
     id: uuidv7(),
-    namespace: "memory",
+    namespace: opts?.namespace ?? "memory",
     type,
     ts: new Date().toISOString(),
     payload,

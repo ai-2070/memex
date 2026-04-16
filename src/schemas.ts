@@ -121,7 +121,7 @@ export const EdgeSchema: z.ZodType<Edge> = z.object({
   to: z.string(),
   kind: EdgeKindSchema,
 
-  weight: z.number().optional(),
+  weight: z.number().min(0).max(1).optional(),
 
   author: z.string(),
   source_kind: SourceKindSchema,
