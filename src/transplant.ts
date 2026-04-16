@@ -603,9 +603,7 @@ export function importSlice(
       const newIntentId = item.intent_id
         ? intentIdMap.get(item.intent_id)
         : undefined;
-      const newTaskId = item.task_id
-        ? taskIdMap.get(item.task_id)
-        : undefined;
+      const newTaskId = item.task_id ? taskIdMap.get(item.task_id) : undefined;
       if (newIntentId || newTaskId) {
         const partial: Partial<MemoryItem> = {};
         if (newIntentId) partial.intent_id = newIntentId;

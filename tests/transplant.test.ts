@@ -526,9 +526,7 @@ describe("regression: shallowEqual with nested objects", () => {
     }).state;
 
     const slice = {
-      memories: [
-        makeItem(id, { content: { key: "theme", value: "light" } }),
-      ],
+      memories: [makeItem(id, { content: { key: "theme", value: "light" } })],
       edges: [],
       intents: [],
       tasks: [],

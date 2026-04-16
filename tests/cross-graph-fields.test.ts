@@ -31,10 +31,7 @@ function fakeUuid(n: number): string {
   return `${ms.slice(0, 8)}-${ms.slice(8, 12)}-7000-8000-${"0".repeat(11)}${n}`;
 }
 
-function makeItem(
-  id: string,
-  overrides: Partial<MemoryItem> = {},
-): MemoryItem {
+function makeItem(id: string, overrides: Partial<MemoryItem> = {}): MemoryItem {
   return {
     id,
     scope: "test",
@@ -172,9 +169,18 @@ describe("IntentFilter parent_id and is_root", () => {
       priority: 0.8,
       owner: "user:laz",
     });
-    state = applyIntentCommand(state, { type: "intent.create", intent: root }).state;
-    state = applyIntentCommand(state, { type: "intent.create", intent: child1 }).state;
-    state = applyIntentCommand(state, { type: "intent.create", intent: child2 }).state;
+    state = applyIntentCommand(state, {
+      type: "intent.create",
+      intent: root,
+    }).state;
+    state = applyIntentCommand(state, {
+      type: "intent.create",
+      intent: child1,
+    }).state;
+    state = applyIntentCommand(state, {
+      type: "intent.create",
+      intent: child2,
+    }).state;
     return state;
   }
 
@@ -312,16 +318,22 @@ describe("transplant rewrites parent_id", () => {
       owner: "user:laz",
     });
 
-    const result = importSlice(memState, intentState, taskState, {
-      memories: [],
-      edges: [],
-      intents: [sliceParent, sliceChild],
-      tasks: [],
-    }, {
-      skipExistingIds: true,
-      shallowCompareExisting: true,
-      reIdOnDifference: true,
-    });
+    const result = importSlice(
+      memState,
+      intentState,
+      taskState,
+      {
+        memories: [],
+        edges: [],
+        intents: [sliceParent, sliceChild],
+        tasks: [],
+      },
+      {
+        skipExistingIds: true,
+        shallowCompareExisting: true,
+        reIdOnDifference: true,
+      },
+    );
 
     // parent got re-id'd
     const newParentId = result.report.created.intents[0];
@@ -367,16 +379,22 @@ describe("transplant rewrites parent_id", () => {
       priority: 0.7,
     });
 
-    const result = importSlice(memState, intentState, taskState, {
-      memories: [],
-      edges: [],
-      intents: [],
-      tasks: [sliceParent, sliceChild],
-    }, {
-      skipExistingIds: true,
-      shallowCompareExisting: true,
-      reIdOnDifference: true,
-    });
+    const result = importSlice(
+      memState,
+      intentState,
+      taskState,
+      {
+        memories: [],
+        edges: [],
+        intents: [],
+        tasks: [sliceParent, sliceChild],
+      },
+      {
+        skipExistingIds: true,
+        shallowCompareExisting: true,
+        reIdOnDifference: true,
+      },
+    );
 
     // parent got re-id'd
     const newParentId = result.report.created.tasks[0];

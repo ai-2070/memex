@@ -121,11 +121,23 @@ export function filterContradictions(
     // Sort contradiction edges deterministically: highest max-score pair first,
     // then by min-score descending, then by edge_id for absolute stability.
     contradictEdges.sort((a, b) => {
-      const maxA = Math.max(scoreMap.get(a.from) ?? -1, scoreMap.get(a.to) ?? -1);
-      const maxB = Math.max(scoreMap.get(b.from) ?? -1, scoreMap.get(b.to) ?? -1);
+      const maxA = Math.max(
+        scoreMap.get(a.from) ?? -1,
+        scoreMap.get(a.to) ?? -1,
+      );
+      const maxB = Math.max(
+        scoreMap.get(b.from) ?? -1,
+        scoreMap.get(b.to) ?? -1,
+      );
       if (maxA !== maxB) return maxB - maxA;
-      const minA = Math.min(scoreMap.get(a.from) ?? -1, scoreMap.get(a.to) ?? -1);
-      const minB = Math.min(scoreMap.get(b.from) ?? -1, scoreMap.get(b.to) ?? -1);
+      const minA = Math.min(
+        scoreMap.get(a.from) ?? -1,
+        scoreMap.get(a.to) ?? -1,
+      );
+      const minB = Math.min(
+        scoreMap.get(b.from) ?? -1,
+        scoreMap.get(b.to) ?? -1,
+      );
       if (minA !== minB) return minB - minA;
       return a.edge_id < b.edge_id ? -1 : 1;
     });
@@ -142,9 +154,7 @@ export function filterContradictions(
           excluded.add(scoreA > scoreB ? edge.to : edge.from);
         } else {
           // deterministic tiebreak: exclude the lexicographically larger id
-          excluded.add(
-            edge.from < edge.to ? edge.to : edge.from,
-          );
+          excluded.add(edge.from < edge.to ? edge.to : edge.from);
         }
       }
     }

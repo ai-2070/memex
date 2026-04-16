@@ -260,11 +260,7 @@ describe("memory.retract — orphan edge cleanup", () => {
 
   it("does not remove edges unrelated to retracted item", () => {
     let state = stateWith(
-      [
-        makeItem({ id: "m1" }),
-        makeItem({ id: "m2" }),
-        makeItem({ id: "m3" }),
-      ],
+      [makeItem({ id: "m1" }), makeItem({ id: "m2" }), makeItem({ id: "m3" })],
       [makeEdge({ edge_id: "e1", from: "m2", to: "m3" })],
     );
     const { state: next } = applyCommand(state, {

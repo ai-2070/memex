@@ -382,9 +382,6 @@ export function getTasksByIntent(state: TaskState, intentId: string): Task[] {
   return getTasks(state, { intent_id: intentId });
 }
 
-export function getChildTasks(
-  state: TaskState,
-  parentId: string,
-): Task[] {
+export function getChildTasks(state: TaskState, parentId: string): Task[] {
   return getTasks(state, { parent_id: parentId });
 }
