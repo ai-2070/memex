@@ -132,6 +132,25 @@ describe("createEventEnvelope", () => {
     expect(env.payload).toEqual({ test: true });
   });
 
+  it("defaults namespace to memory when not specified", () => {
+    const env = createEventEnvelope("memory.create", {});
+    expect(env.namespace).toBe("memory");
+  });
+
+  it("uses custom namespace when provided", () => {
+    const env = createEventEnvelope("intent.create", { id: "i1" }, { namespace: "intent" });
+    expect(env.namespace).toBe("intent");
+  });
+
+  it("uses custom namespace with trace_id together", () => {
+    const env = createEventEnvelope("task.start", null, {
+      trace_id: "t-1",
+      namespace: "task",
+    });
+    expect(env.namespace).toBe("task");
+    expect(env.trace_id).toBe("t-1");
+  });
+
   it("includes trace_id when provided", () => {
     const env = createEventEnvelope("test", null, { trace_id: "t-123" });
     expect(env.trace_id).toBe("t-123");

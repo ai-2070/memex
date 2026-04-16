@@ -280,13 +280,44 @@ function shallowEqual(
     const va = a[key];
     const vb = b[key];
     if (va === vb) continue;
-    if (
+    if (Array.isArray(va) && Array.isArray(vb)) {
+      if (va.length !== vb.length) return false;
+      for (let i = 0; i < va.length; i++) {
+        const ai = va[i];
+        const bi = vb[i];
+        if (ai === bi) continue;
+        if (
+          typeof ai === "object" &&
+          ai !== null &&
+          typeof bi === "object" &&
+          bi !== null &&
+          !Array.isArray(ai) &&
+          !Array.isArray(bi)
+        ) {
+          if (
+            !shallowEqual(
+              ai as Record<string, unknown>,
+              bi as Record<string, unknown>,
+            )
+          )
+            return false;
+        } else {
+          return false;
+        }
+      }
+    } else if (
       typeof va === "object" &&
       va !== null &&
       typeof vb === "object" &&
       vb !== null
     ) {
-      if (JSON.stringify(va) !== JSON.stringify(vb)) return false;
+      if (
+        !shallowEqual(
+          va as Record<string, unknown>,
+          vb as Record<string, unknown>,
+        )
+      )
+        return false;
     } else {
       return false;
     }
