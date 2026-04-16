@@ -1096,3 +1096,75 @@ const result2 = importSlice(mem, intents, tasks, slice, {
 When `reIdOnDifference` is true, all internal references (`parents`, `Edge.from/to`, `intent_id`, `input/output_memory_ids`, `root_memory_ids`) are rewritten to the new ids. The original entity is not touched or linked.
 
 **Re-id timestamp preservation:** new ids are generated at +1ms from the original entity's timestamp (extracted from the uuidv7), not from `Date.now()`. This preserves temporal ordering — decay scoring and recency sort are unaffected. If the +1ms id also collides, it increments by another 1ms until a free slot is found.
+
+## Validation (Zod Schemas)
+
+Optional runtime validation schemas for every exported type. Requires `zod >= 4` as a peer dependency — if you don't import from `@ai2070/memex/schemas`, zod is not required.
+
+```bash
+npm install zod
+```
+
+```ts
+import { MemoryItemSchema, MemoryCommandSchema } from "@ai2070/memex/schemas";
+```
+
+Every schema is typed as `z.ZodType<T>` against the source interface, so the TypeScript compiler will error if a schema drifts out of sync with its type.
+
+### Available Schemas
+
+| Schema | Validates |
+|--------|-----------|
+| `MemoryItemSchema` | `MemoryItem` |
+| `EdgeSchema` | `Edge` |
+| `EventEnvelopeSchema` | `EventEnvelope` |
+| `MemoryCommandSchema` | `MemoryCommand` (discriminated union) |
+| `MemoryLifecycleEventSchema` | `MemoryLifecycleEvent` |
+| `MemoryFilterSchema` | `MemoryFilter` (recursive) |
+| `EdgeFilterSchema` | `EdgeFilter` |
+| `SortFieldSchema` | `SortField` |
+| `SortOptionSchema` | `SortOption` |
+| `QueryOptionsSchema` | `QueryOptions` |
+| `DecayConfigSchema` | `DecayConfig` |
+| `ScoreWeightsSchema` | `ScoreWeights` |
+| `ScoredItemSchema` | `ScoredItem` |
+| `IntentSchema` | `Intent` |
+| `IntentCommandSchema` | `IntentCommand` (discriminated union) |
+| `IntentLifecycleEventSchema` | `IntentLifecycleEvent` |
+| `IntentFilterSchema` | `IntentFilter` |
+| `TaskSchema` | `Task` |
+| `TaskCommandSchema` | `TaskCommand` (discriminated union) |
+| `TaskLifecycleEventSchema` | `TaskLifecycleEvent` |
+| `TaskFilterSchema` | `TaskFilter` |
+| `MemexExportSchema` | `MemexExport` |
+| `KnownMemoryKindSchema` | `KnownMemoryKind` (enum) |
+| `KnownEdgeKindSchema` | `KnownEdgeKind` (enum) |
+| `KnownNamespaceSchema` | `KnownNamespace` (enum) |
+| `IntentStatusSchema` | `IntentStatus` (enum) |
+| `TaskStatusSchema` | `TaskStatus` (enum) |
+| `DecayIntervalSchema` | `DecayInterval` (enum) |
+| `DecayTypeSchema` | `DecayType` (enum) |
+
+### Example: validating external input
+
+```ts
+import { MemoryCommandSchema } from "@ai2070/memex/schemas";
+
+function handleCommand(raw: unknown) {
+  const cmd = MemoryCommandSchema.parse(raw); // throws ZodError on invalid input
+  return applyCommand(state, cmd);
+}
+```
+
+### Example: safe parsing
+
+```ts
+import { MemoryItemSchema } from "@ai2070/memex/schemas";
+
+const result = MemoryItemSchema.safeParse(data);
+if (result.success) {
+  console.log(result.data.id);
+} else {
+  console.error(result.error.issues);
+}
+```
