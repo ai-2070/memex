@@ -444,6 +444,14 @@ describe("getItems with QueryOptions", () => {
     expect(result[0].id).toBe("m1");
     expect(result[1].id).toBe("m2");
   });
+
+  it("throws on unknown sort field", () => {
+    expect(() =>
+      getItems(state, undefined, {
+        sort: { field: "bogus" as any, order: "asc" },
+      }),
+    ).toThrow(/Unknown sort field.*bogus/);
+  });
 });
 
 // -- getEdges --

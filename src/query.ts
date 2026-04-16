@@ -196,6 +196,10 @@ function getSortValue(item: MemoryItem, field: SortField): number {
       return item.importance ?? 0;
     case "recency":
       return itemTimestamp(item);
+    default:
+      throw new RangeError(
+        `Unknown sort field: "${field as string}". Expected "authority", "conviction", "importance", or "recency".`,
+      );
   }
 }
 
