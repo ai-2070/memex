@@ -1,0 +1,25 @@
+API.md
+  465d8d6680d7689d 589
+src/query.ts
+  465d8d6680d7689d 199-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "cf9a0d1e1239ce6faddd5c6512e0eeeac67ffaeb",
+  "prompts": {
+    "465d8d6680d7689d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9469f364-b159-4e35-ae77-003f184e7bbd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 2,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
