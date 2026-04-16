@@ -396,9 +396,7 @@ describe("extractTimestamp", () => {
   });
 
   it("throws for non-UUIDv7 id", () => {
-    expect(() => extractTimestamp("not-a-uuid")).toThrow(
-      "not a valid UUIDv7",
-    );
+    expect(() => extractTimestamp("not-a-uuid")).toThrow("not a valid UUIDv7");
   });
 
   it("throws for custom id without UUIDv7 format", () => {

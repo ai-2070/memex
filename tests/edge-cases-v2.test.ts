@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { applyCommand } from "../src/reducer.js";
 import { createGraphState } from "../src/graph.js";
-import {
-  getItems,
-  getScoredItems,
-  extractTimestamp,
-} from "../src/query.js";
+import { getItems, getScoredItems, extractTimestamp } from "../src/query.js";
 import { exportSlice, importSlice } from "../src/transplant.js";
 import {
   createIntentState,
@@ -19,9 +15,7 @@ import {
   createTask,
   InvalidTaskTransitionError,
 } from "../src/task.js";
-import {
-  surfaceContradictions,
-} from "../src/retrieval.js";
+import { surfaceContradictions } from "../src/retrieval.js";
 import { markContradiction } from "../src/integrity.js";
 import type { MemoryItem, Edge, GraphState, ScoredItem } from "../src/types.js";
 
@@ -61,12 +55,10 @@ describe("exportSlice with circular parents", () => {
       makeItem("m1", { parents: ["m2"] }),
       makeItem("m2", { parents: ["m1"] }),
     ]);
-    const slice = exportSlice(
-      state,
-      createIntentState(),
-      createTaskState(),
-      { memory_ids: ["m1"], include_parents: true },
-    );
+    const slice = exportSlice(state, createIntentState(), createTaskState(), {
+      memory_ids: ["m1"],
+      include_parents: true,
+    });
     expect(slice.memories.map((m) => m.id).sort()).toEqual(["m1", "m2"]);
   });
 
@@ -75,12 +67,10 @@ describe("exportSlice with circular parents", () => {
       makeItem("m1", { parents: ["m2"] }),
       makeItem("m2", { parents: ["m1"] }),
     ]);
-    const slice = exportSlice(
-      state,
-      createIntentState(),
-      createTaskState(),
-      { memory_ids: ["m1"], include_children: true },
-    );
+    const slice = exportSlice(state, createIntentState(), createTaskState(), {
+      memory_ids: ["m1"],
+      include_children: true,
+    });
     expect(slice.memories.map((m) => m.id).sort()).toEqual(["m1", "m2"]);
   });
 });
@@ -131,7 +121,12 @@ describe("intent update on terminal states", () => {
     let state = createIntentState();
     state = applyIntentCommand(state, {
       type: "intent.create",
-      intent: createIntent({ id: "i1", label: "test", priority: 0.5, owner: "user:laz" }),
+      intent: createIntent({
+        id: "i1",
+        label: "test",
+        priority: 0.5,
+        owner: "user:laz",
+      }),
     }).state;
     state = applyIntentCommand(state, {
       type: "intent.complete",
@@ -153,7 +148,12 @@ describe("intent update on terminal states", () => {
     let state = createIntentState();
     state = applyIntentCommand(state, {
       type: "intent.create",
-      intent: createIntent({ id: "i1", label: "test", priority: 0.5, owner: "user:laz" }),
+      intent: createIntent({
+        id: "i1",
+        label: "test",
+        priority: 0.5,
+        owner: "user:laz",
+      }),
     }).state;
     state = applyIntentCommand(state, {
       type: "intent.cancel",
@@ -179,10 +179,19 @@ describe("task state machine edge cases", () => {
     let state = createTaskState();
     state = applyTaskCommand(state, {
       type: "task.create",
-      task: createTask({ id: "t1", intent_id: "i1", action: "test", priority: 0.5 }),
+      task: createTask({
+        id: "t1",
+        intent_id: "i1",
+        action: "test",
+        priority: 0.5,
+      }),
     }).state;
     expect(() =>
-      applyTaskCommand(state, { type: "task.fail", task_id: "t1", error: "oops" }),
+      applyTaskCommand(state, {
+        type: "task.fail",
+        task_id: "t1",
+        error: "oops",
+      }),
     ).toThrow(InvalidTaskTransitionError);
   });
 
@@ -190,14 +199,23 @@ describe("task state machine edge cases", () => {
     let state = createTaskState();
     state = applyTaskCommand(state, {
       type: "task.create",
-      task: createTask({ id: "t1", intent_id: "i1", action: "test", priority: 0.5 }),
+      task: createTask({
+        id: "t1",
+        intent_id: "i1",
+        action: "test",
+        priority: 0.5,
+      }),
     }).state;
     state = applyTaskCommand(state, {
       type: "task.cancel",
       task_id: "t1",
     }).state;
     expect(() =>
-      applyTaskCommand(state, { type: "task.fail", task_id: "t1", error: "oops" }),
+      applyTaskCommand(state, {
+        type: "task.fail",
+        task_id: "t1",
+        error: "oops",
+      }),
     ).toThrow(InvalidTaskTransitionError);
   });
 
@@ -205,7 +223,12 @@ describe("task state machine edge cases", () => {
     let state = createTaskState();
     state = applyTaskCommand(state, {
       type: "task.create",
-      task: createTask({ id: "t1", intent_id: "i1", action: "test", priority: 0.5 }),
+      task: createTask({
+        id: "t1",
+        intent_id: "i1",
+        action: "test",
+        priority: 0.5,
+      }),
     }).state;
     state = applyTaskCommand(state, {
       type: "task.cancel",
@@ -217,7 +240,9 @@ describe("task state machine edge cases", () => {
       partial: { meta: { cancelled_reason: "no longer needed" } },
       author: "test",
     });
-    expect(next.tasks.get("t1")!.meta?.cancelled_reason).toBe("no longer needed");
+    expect(next.tasks.get("t1")!.meta?.cancelled_reason).toBe(
+      "no longer needed",
+    );
   });
 });
 
@@ -227,9 +252,7 @@ describe("task state machine edge cases", () => {
 
 describe("reducer nested undefined handling", () => {
   it("setting content key to undefined preserves it", () => {
-    const state = stateWith([
-      makeItem("m1", { content: { a: 1, b: 2 } }),
-    ]);
+    const state = stateWith([makeItem("m1", { content: { a: 1, b: 2 } })]);
     const { state: next } = applyCommand(state, {
       type: "memory.update",
       item_id: "m1",
@@ -304,7 +327,12 @@ describe("surfaceContradictions immutability", () => {
       makeItem("m1", { authority: 0.9 }),
       makeItem("m2", { authority: 0.7 }),
     ]);
-    const { state: marked } = markContradiction(state, "m1", "m2", "system:detector");
+    const { state: marked } = markContradiction(
+      state,
+      "m1",
+      "m2",
+      "system:detector",
+    );
 
     const original: ScoredItem[] = [
       { item: marked.items.get("m1")!, score: 0.9 },
@@ -334,12 +362,10 @@ describe("transplant with circular parents", () => {
       makeItem("m2", { parents: ["m1"] }),
     ]);
 
-    const slice = exportSlice(
-      state,
-      createIntentState(),
-      createTaskState(),
-      { memory_ids: ["m1"], include_parents: true },
-    );
+    const slice = exportSlice(state, createIntentState(), createTaskState(), {
+      memory_ids: ["m1"],
+      include_parents: true,
+    });
 
     const result = importSlice(
       createGraphState(),
