@@ -1,0 +1,31 @@
+src/schemas.ts
+  9a71a1716de11d39 124
+src/transplant.ts
+  9a71a1716de11d39 283-288,294-300
+tests/transplant.test.ts
+  9a71a1716de11d39 519-569
+tests/helpers.test.ts
+  9a71a1716de11d39 135-153
+src/helpers.ts
+  9a71a1716de11d39 2,61,65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "18b9ed36f319eb3ea32fcda1cbc49014b133c85d",
+  "prompts": {
+    "9a71a1716de11d39": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a6661c86-c22c-4929-b53b-5cba0c2396df",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 98,
+      "total_deletions": 6,
+      "accepted_lines": 98,
+      "overriden_lines": 0
+    }
+  }
+}
