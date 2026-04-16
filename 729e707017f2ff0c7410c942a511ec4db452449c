@@ -1,0 +1,23 @@
+tests/transplant.test.ts
+  465d8d6680d7689d 420-548
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "729e707017f2ff0c7410c942a511ec4db452449c",
+  "prompts": {
+    "465d8d6680d7689d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9469f364-b159-4e35-ae77-003f184e7bbd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 129,
+      "total_deletions": 0,
+      "accepted_lines": 129,
+      "overriden_lines": 0
+    }
+  }
+}
