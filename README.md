@@ -102,6 +102,12 @@ With MemEX, an agent:
 npm install @ai2070/memex
 ```
 
+For runtime validation with Zod schemas (optional):
+
+```bash
+npm install zod
+```
+
 ## Quick Start
 
 ```ts
@@ -424,6 +430,11 @@ Memory is no longer a local resource. It is portable belief.
 - Import into another graph instance — default: skip existing ids, append-only
 - Optional shallow compare to detect conflicts, optional re-id to mint new ids on conflict
 - JSON-serializable slices for migration, sub-agent isolation, cloning, and backup
+
+**Validation (optional, requires `zod >= 4`):**
+- Zod schemas for every exported type — `MemoryItemSchema`, `EdgeSchema`, `IntentSchema`, `TaskSchema`, commands, filters, and more
+- Schemas are type-wired to the source interfaces via `z.ZodType<T>` — if a type changes, the schema must be updated or the build fails
+- Available as a separate entry point: `import { MemoryItemSchema } from "@ai2070/memex/schemas"`
 
 ## Multi-Agent & Crew Orchestration
 
