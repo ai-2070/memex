@@ -417,3 +417,132 @@ describe("export + import round-trip", () => {
     expect(result.intentState.intents.size).toBe(1);
   });
 });
+
+// ============================================================
+// Regression tests
+// ============================================================
+
+describe("regression: reIdFor with non-UUIDv7 ids", () => {
+  it("re-ids non-UUIDv7 item when created_at is provided", () => {
+    const nonUuid = "custom-id-not-uuidv7";
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(nonUuid, { authority: 0.9, created_at: 1700000000000 }),
+    }).state;
+
+    const slice = {
+      memories: [
+        makeItem(nonUuid, { authority: 0.1, created_at: 1700000000000 }),
+      ],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true, reIdOnDifference: true },
+    );
+
+    expect(result.memState.items.size).toBe(2);
+    expect(result.report.created.memories).toHaveLength(1);
+    const newId = result.report.created.memories[0];
+    expect(newId).not.toBe(nonUuid);
+    expect(result.memState.items.get(newId)!.authority).toBe(0.1);
+  });
+
+  it("throws clear error for non-UUIDv7 id without created_at", () => {
+    const nonUuid = "custom-id-not-uuidv7";
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(nonUuid, { authority: 0.9 }),
+    }).state;
+
+    const slice = {
+      memories: [makeItem(nonUuid, { authority: 0.1 })],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    expect(() =>
+      importSlice(targetMem, createIntentState(), createTaskState(), slice, {
+        shallowCompareExisting: true,
+        reIdOnDifference: true,
+      }),
+    ).toThrow(/Cannot re-id.*created_at/);
+  });
+});
+
+describe("regression: shallowEqual with nested objects", () => {
+  it("skips when items differ only by object identity (not value)", () => {
+    const id = fakeUuid(10);
+    const content = { key: "theme", value: "dark" };
+    const meta = { source: "ui", tags: { env: "prod" } };
+
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(id, { content: { ...content }, meta: { ...meta } }),
+    }).state;
+
+    // structurally identical but distinct objects (e.g. after JSON round-trip)
+    const slice = {
+      memories: [
+        makeItem(id, {
+          content: JSON.parse(JSON.stringify(content)),
+          meta: JSON.parse(JSON.stringify(meta)),
+        }),
+      ],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true },
+    );
+
+    expect(result.report.skipped.memories).toEqual([id]);
+    expect(result.report.conflicts.memories).toHaveLength(0);
+  });
+
+  it("detects actual content differences in nested objects", () => {
+    const id = fakeUuid(11);
+
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(id, { content: { key: "theme", value: "dark" } }),
+    }).state;
+
+    const slice = {
+      memories: [
+        makeItem(id, { content: { key: "theme", value: "light" } }),
+      ],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true },
+    );
+
+    expect(result.report.conflicts.memories).toEqual([id]);
+    expect(result.report.skipped.memories).toHaveLength(0);
+  });
+});
