@@ -578,6 +578,38 @@ describe("regression: shallowEqual with nested objects", () => {
     expect(result.report.conflicts.memories).toHaveLength(0);
   });
 
+  it("treats arrays with structurally equal object elements as equal", () => {
+    const id = fakeUuid(14);
+
+    let targetMem = createGraphState();
+    targetMem = applyCommand(targetMem, {
+      type: "memory.create",
+      item: makeItem(id, { content: { items: [{ a: 1 }, { b: 2 }] } }),
+    }).state;
+
+    const slice = {
+      memories: [
+        makeItem(id, {
+          content: { items: [{ a: 1 }, { b: 2 }] },
+        }),
+      ],
+      edges: [],
+      intents: [],
+      tasks: [],
+    };
+
+    const result = importSlice(
+      targetMem,
+      createIntentState(),
+      createTaskState(),
+      slice,
+      { shallowCompareExisting: true },
+    );
+
+    expect(result.report.skipped.memories).toEqual([id]);
+    expect(result.report.conflicts.memories).toHaveLength(0);
+  });
+
   it("detects actual content differences in nested objects", () => {
     const id = fakeUuid(11);
 
