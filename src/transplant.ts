@@ -36,7 +36,16 @@ function reIdFor(
   existingIds: Set<string>,
   createdAt?: number,
 ): string {
-  let ms = createdAt ?? extractTimestamp(originalId);
+  if (createdAt === undefined) {
+    try {
+      createdAt = extractTimestamp(originalId);
+    } catch {
+      throw new Error(
+        `Cannot re-id "${originalId}": provide created_at or use a UUIDv7 id`,
+      );
+    }
+  }
+  let ms = createdAt;
   ms += 1;
   let newId = uuidFromMs(ms);
   while (existingIds.has(newId)) {
@@ -268,7 +277,19 @@ function shallowEqual(
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
-    if (a[key] !== b[key]) return false;
+    const va = a[key];
+    const vb = b[key];
+    if (va === vb) continue;
+    if (
+      typeof va === "object" &&
+      va !== null &&
+      typeof vb === "object" &&
+      vb !== null
+    ) {
+      if (JSON.stringify(va) !== JSON.stringify(vb)) return false;
+    } else {
+      return false;
+    }
   }
   return true;
 }
