@@ -586,7 +586,7 @@ applyMany(state, {}, () => ({ meta: { hot: true } }), "system:tagger",
 
 Items retracted by a prior transform in the same batch are skipped (no crash).
 
-### bulkAdjustScores(state, criteria, delta, author, reason?, basis?)
+### bulkAdjustScores(state, criteria, delta, author, reason?)
 
 Convenience wrapper around `applyMany` for delta-based score adjustments with clamping to [0, 1].
 

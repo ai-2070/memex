@@ -80,7 +80,6 @@ export function bulkAdjustScores(
   delta: ScoreAdjustment,
   author: string,
   reason?: string,
-  basis?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
   return applyMany(
     state,
