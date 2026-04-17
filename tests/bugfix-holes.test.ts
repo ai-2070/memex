@@ -26,11 +26,7 @@ import {
   createIntent,
   applyIntentCommand,
 } from "../src/intent.js";
-import {
-  createTaskState,
-  createTask,
-  applyTaskCommand,
-} from "../src/task.js";
+import { createTaskState, createTask, applyTaskCommand } from "../src/task.js";
 import { exportSlice, importSlice } from "../src/transplant.js";
 import { replayFromEnvelopes } from "../src/replay.js";
 import type { MemoryItem, Edge, GraphState, ScoredItem } from "../src/types.js";
@@ -56,10 +52,7 @@ function fakeId(tsMs: number): string {
   ].join("-");
 }
 
-function makeItem(
-  id: string,
-  overrides: Partial<MemoryItem> = {},
-): MemoryItem {
+function makeItem(id: string, overrides: Partial<MemoryItem> = {}): MemoryItem {
   return {
     id,
     scope: "test",
@@ -92,10 +85,7 @@ function makeEdge(
   };
 }
 
-function stateWith(
-  items: MemoryItem[],
-  edges: Edge[] = [],
-): GraphState {
+function stateWith(items: MemoryItem[], edges: Edge[] = []): GraphState {
   let state = createGraphState();
   for (const item of items) {
     state = applyCommand(state, { type: "memory.create", item }).state;
@@ -202,7 +192,9 @@ describe("importSlice edge re-id on conflict", () => {
     const taskState = createTaskState();
 
     // add an edge to the existing state
-    const existingEdge = makeEdge("e1", "m1", "m2", "SUPPORTS", { weight: 0.5 });
+    const existingEdge = makeEdge("e1", "m1", "m2", "SUPPORTS", {
+      weight: 0.5,
+    });
     const stateWithEdge = applyCommand(memState, {
       type: "edge.create",
       edge: existingEdge,
@@ -239,7 +231,9 @@ describe("importSlice edge re-id on conflict", () => {
     const intentState = createIntentState();
     const taskState = createTaskState();
 
-    const existingEdge = makeEdge("e1", "m1", "m2", "SUPPORTS", { weight: 0.5 });
+    const existingEdge = makeEdge("e1", "m1", "m2", "SUPPORTS", {
+      weight: 0.5,
+    });
     const stateWithEdge = applyCommand(memState, {
       type: "edge.create",
       edge: existingEdge,
@@ -626,9 +620,7 @@ describe("resolveContradiction with multiple CONTRADICTS edges", () => {
 
 describe("exportSlice walks intent_id", () => {
   it("includes intents referenced by memory intent_id", () => {
-    const memState = stateWith([
-      makeItem("m1", { intent_id: "i1" }),
-    ]);
+    const memState = stateWith([makeItem("m1", { intent_id: "i1" })]);
     let intentState = createIntentState();
     const intent = createIntent({
       id: "i1",
@@ -658,9 +650,7 @@ describe("exportSlice walks intent_id", () => {
 
 describe("exportSlice walks task_id", () => {
   it("includes tasks referenced by memory task_id", () => {
-    const memState = stateWith([
-      makeItem("m1", { task_id: "t1" }),
-    ]);
+    const memState = stateWith([makeItem("m1", { task_id: "t1" })]);
     const intentState = createIntentState();
     let taskState = createTaskState();
     const task = createTask({

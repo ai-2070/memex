@@ -38,16 +38,8 @@ import {
 import { exportSlice, importSlice } from "../src/transplant.js";
 import { toJSON, fromJSON, stringify, parse } from "../src/serialization.js";
 import { cloneGraphState } from "../src/graph.js";
-import {
-  DuplicateMemoryError,
-  EdgeNotFoundError,
-} from "../src/errors.js";
-import type {
-  MemoryItem,
-  Edge,
-  GraphState,
-  ScoredItem,
-} from "../src/types.js";
+import { DuplicateMemoryError, EdgeNotFoundError } from "../src/errors.js";
+import type { MemoryItem, Edge, GraphState, ScoredItem } from "../src/types.js";
 import type { IntentState, Intent } from "../src/intent.js";
 import type { TaskState, Task } from "../src/task.js";
 
@@ -457,9 +449,13 @@ describe("getScoredItems — post filter", () => {
       makeItem("m3", { authority: 0.7, scope: "a" }),
     ]);
 
-    const result = getScoredItems(state, { authority: 1 }, {
-      post: { scope: "a" },
-    });
+    const result = getScoredItems(
+      state,
+      { authority: 1 },
+      {
+        post: { scope: "a" },
+      },
+    );
     expect(result).toHaveLength(2);
     expect(result.every((r) => r.item.scope === "a")).toBe(true);
     // should be sorted by score
@@ -640,7 +636,9 @@ describe("importSlice — skipExistingIds: false", () => {
       tasks: [],
     };
 
-    const result = importSlice(mem, intents, tasks, slice, { skipExistingIds: false });
+    const result = importSlice(mem, intents, tasks, slice, {
+      skipExistingIds: false,
+    });
     expect(result.memState.items.get("m1")!.content).toEqual({ new: true });
     expect(result.report.updated.memories).toEqual(["m1"]);
   });
@@ -737,7 +735,10 @@ describe("surfaceContradictions — repeated calls", () => {
     const scored = toScored([m1, m2], [0.5, 0.5]);
     const result1 = surfaceContradictions(state, scored);
     // calling again with fresh scored (no stale contradicted_by)
-    const result2 = surfaceContradictions(state, toScored([m1, m2], [0.5, 0.5]));
+    const result2 = surfaceContradictions(
+      state,
+      toScored([m1, m2], [0.5, 0.5]),
+    );
 
     const r1m1 = result1.find((s) => s.item.id === "m1")!;
     const r2m1 = result2.find((s) => s.item.id === "m1")!;
@@ -916,10 +917,7 @@ describe("created filter — boundary semantics", () => {
     const ts = 1700000000000;
     const hex = ts.toString(16).padStart(12, "0");
     const id =
-      hex.slice(0, 8) +
-      "-" +
-      hex.slice(8, 12) +
-      "-7000-8000-000000000000";
+      hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-7000-8000-000000000000";
 
     const state = stateWith([makeItem(id)]);
     const items = getItems(state, { created: { before: ts } });
@@ -930,10 +928,7 @@ describe("created filter — boundary semantics", () => {
     const ts = 1700000000000;
     const hex = ts.toString(16).padStart(12, "0");
     const id =
-      hex.slice(0, 8) +
-      "-" +
-      hex.slice(8, 12) +
-      "-7000-8000-000000000000";
+      hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-7000-8000-000000000000";
 
     const state = stateWith([makeItem(id)]);
     const items = getItems(state, { created: { after: ts } });
@@ -944,10 +939,7 @@ describe("created filter — boundary semantics", () => {
     const ts = 1700000000000;
     const hex = ts.toString(16).padStart(12, "0");
     const id =
-      hex.slice(0, 8) +
-      "-" +
-      hex.slice(8, 12) +
-      "-7000-8000-000000000000";
+      hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-7000-8000-000000000000";
 
     const state = stateWith([makeItem(id)]);
     const items = getItems(state, {

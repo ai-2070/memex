@@ -31,7 +31,8 @@ function uuidFromMs(ms: number): string {
  * Generate a new id 1ms after the original, incrementing until no collision.
  */
 function reIdFor(originalId: string, existingIds: Set<string>): string {
-  let ms = extractTimestamp(originalId) + 1;
+  const baseMs = extractTimestamp(originalId);
+  let ms = (isNaN(baseMs) ? Date.now() : baseMs) + 1;
   let newId = uuidFromMs(ms);
   while (existingIds.has(newId)) {
     ms++;
@@ -242,6 +243,37 @@ export interface ImportReport {
   };
 }
 
+/**
+ * Deep structural equality for plain-data values.
+ * Needed because shallowCompareExisting is typically invoked on deserialized
+ * slices, where nested objects (content, meta, parents) are never === to their
+ * counterparts in the live state.
+ */
+function valueEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  if (typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const arrB = b as unknown[];
+    if (a.length !== arrB.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!valueEqual(a[i], arrB[i])) return false;
+    }
+    return true;
+  }
+  const objA = a as Record<string, unknown>;
+  const objB = b as Record<string, unknown>;
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(objB, key)) return false;
+    if (!valueEqual(objA[key], objB[key])) return false;
+  }
+  return true;
+}
+
 function shallowEqual(
   a: Record<string, unknown>,
   b: Record<string, unknown>,
@@ -250,7 +282,8 @@ function shallowEqual(
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
-    if (a[key] !== b[key]) return false;
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (!valueEqual(a[key], b[key])) return false;
   }
   return true;
 }
@@ -304,6 +337,20 @@ export function importSlice(
   let currentIntent = intentState;
   let currentTask = taskState;
 
+  // --- memory re-id pre-pass ---
+  // Populate memIdMap BEFORE any memory is processed so that cross-references
+  // (e.g. parents) see the final ids regardless of slice ordering.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const item of slice.memories) {
+      const existing = memState.items.get(item.id);
+      if (existing && !shallowEqual(existing as any, item as any)) {
+        const newId = reIdFor(item.id, allMemIds);
+        allMemIds.add(newId);
+        memIdMap.set(item.id, newId);
+      }
+    }
+  }
+
   // --- import memories ---
   for (const item of slice.memories) {
     const existing = currentMem.items.get(item.id);
@@ -311,9 +358,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, item as any)) {
           if (doReId) {
-            const newId = reIdFor(item.id, allMemIds);
-            allMemIds.add(newId);
-            memIdMap.set(item.id, newId);
+            const newId = memIdMap.get(item.id)!;
             const remapped: MemoryItem = {
               ...item,
               id: newId,
@@ -416,6 +461,20 @@ export function importSlice(
     report.created.edges.push(edge.edge_id);
   }
 
+  // --- intent re-id pre-pass ---
+  // Populate intentIdMap before processing so that parent_id references
+  // remap correctly regardless of slice ordering.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const intent of slice.intents) {
+      const existing = currentIntent.intents.get(intent.id);
+      if (existing && !shallowEqual(existing as any, intent as any)) {
+        const newId = reIdFor(intent.id, allIntentIds);
+        allIntentIds.add(newId);
+        intentIdMap.set(intent.id, newId);
+      }
+    }
+  }
+
   // --- import intents ---
   for (const intent of slice.intents) {
     const existing = currentIntent.intents.get(intent.id);
@@ -423,9 +482,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, intent as any)) {
           if (doReId) {
-            const newId = reIdFor(intent.id, allIntentIds);
-            allIntentIds.add(newId);
-            intentIdMap.set(intent.id, newId);
+            const newId = intentIdMap.get(intent.id)!;
             const remapped: Intent = {
               ...intent,
               id: newId,
@@ -481,6 +538,20 @@ export function importSlice(
     report.created.intents.push(intent.id);
   }
 
+  // --- task re-id pre-pass ---
+  // Populate taskIdMap before processing so that parent_id references
+  // remap correctly regardless of slice ordering.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const task of slice.tasks) {
+      const existing = currentTask.tasks.get(task.id);
+      if (existing && !shallowEqual(existing as any, task as any)) {
+        const newId = reIdFor(task.id, allTaskIds);
+        allTaskIds.add(newId);
+        taskIdMap.set(task.id, newId);
+      }
+    }
+  }
+
   // --- import tasks ---
   for (const task of slice.tasks) {
     const existing = currentTask.tasks.get(task.id);
@@ -488,9 +559,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, task as any)) {
           if (doReId) {
-            const newId = reIdFor(task.id, allTaskIds);
-            allTaskIds.add(newId);
-            taskIdMap.set(task.id, newId);
+            const newId = taskIdMap.get(task.id)!;
             const remapped: Task = {
               ...task,
               id: newId,
@@ -564,9 +633,7 @@ export function importSlice(
       const newIntentId = item.intent_id
         ? intentIdMap.get(item.intent_id)
         : undefined;
-      const newTaskId = item.task_id
-        ? taskIdMap.get(item.task_id)
-        : undefined;
+      const newTaskId = item.task_id ? taskIdMap.get(item.task_id) : undefined;
       if (newIntentId || newTaskId) {
         const partial: Partial<MemoryItem> = {};
         if (newIntentId) partial.intent_id = newIntentId;

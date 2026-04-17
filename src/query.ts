@@ -63,11 +63,17 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
   // cross-graph links
   if (filter.intent_id !== undefined && item.intent_id !== filter.intent_id)
     return false;
-  if (filter.intent_ids !== undefined && (!item.intent_id || !filter.intent_ids.includes(item.intent_id)))
+  if (
+    filter.intent_ids !== undefined &&
+    (!item.intent_id || !filter.intent_ids.includes(item.intent_id))
+  )
     return false;
   if (filter.task_id !== undefined && item.task_id !== filter.task_id)
     return false;
-  if (filter.task_ids !== undefined && (!item.task_id || !filter.task_ids.includes(item.task_id)))
+  if (
+    filter.task_ids !== undefined &&
+    (!item.task_id || !filter.task_ids.includes(item.task_id))
+  )
     return false;
 
   // score ranges
@@ -143,14 +149,22 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
 /**
  * Extract millisecond timestamp from a uuidv7 id.
  * uuidv7 encodes unix ms in the first 48 bits.
+ * Returns NaN for strings that don't match the uuidv7 shape (version nibble
+ * must be '7'), to avoid silently producing nonsense timestamps for ids like
+ * "abc" that parseInt would happily accept.
  */
 export function extractTimestamp(uuidv7Id: string): number {
-  const hex = uuidv7Id.replace(/-/g, "").slice(0, 12);
-  return parseInt(hex, 16);
+  const stripped = uuidv7Id.replace(/-/g, "");
+  if (stripped.length < 16 || stripped[12] !== "7") return NaN;
+  const ts = parseInt(stripped.slice(0, 12), 16);
+  if (isNaN(ts) || ts <= 0) return NaN;
+  return ts;
 }
 
 function itemTimestamp(item: MemoryItem): number {
-  return item.created_at ?? extractTimestamp(item.id);
+  if (item.created_at !== undefined) return item.created_at;
+  const ts = extractTimestamp(item.id);
+  return isNaN(ts) ? 0 : ts;
 }
 
 function getSortValue(item: MemoryItem, field: SortField): number {

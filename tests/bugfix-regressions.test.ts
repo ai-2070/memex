@@ -3,9 +3,7 @@ import { applyCommand, mergeItem } from "../src/reducer.js";
 import { createGraphState } from "../src/graph.js";
 import { createMemoryItem } from "../src/helpers.js";
 import { getItems, getScoredItems, extractTimestamp } from "../src/query.js";
-import {
-  filterContradictions,
-} from "../src/retrieval.js";
+import { filterContradictions } from "../src/retrieval.js";
 import { markContradiction } from "../src/integrity.js";
 import { importSlice, exportSlice } from "../src/transplant.js";
 import {
