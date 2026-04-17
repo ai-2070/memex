@@ -4,6 +4,7 @@ import type {
   MemoryFilter,
   MemoryLifecycleEvent,
   QueryOptions,
+  Edge,
 } from "./types.js";
 import { getItems } from "./query.js";
 import { mergeItem } from "./reducer.js";
@@ -39,6 +40,9 @@ export function applyMany(
   }
 
   const items = new Map(state.items);
+  // Cloned lazily: only pay for it if we actually retract something and
+  // need to cascade edge cleanup.
+  let edges: Map<string, Edge> | null = null;
   const allEvents: MemoryLifecycleEvent[] = [];
   let changed = false;
 
@@ -56,6 +60,24 @@ export function applyMany(
         cause_type: "memory.retract",
       });
       changed = true;
+      // Mirror the reducer's memory.retract behavior: clean up edges that
+      // reference the retracted item so bulk retraction doesn't leave dangling
+      // edges behind.
+      if (edges === null) edges = new Map(state.edges);
+      for (const [edgeId, edge] of state.edges) {
+        if (
+          (edge.from === item.id || edge.to === item.id) &&
+          edges.has(edgeId)
+        ) {
+          edges.delete(edgeId);
+          allEvents.push({
+            namespace: "memory",
+            type: "edge.retracted",
+            edge,
+            cause_type: "memory.retract",
+          });
+        }
+      }
     } else if (Object.keys(partial).length > 0) {
       const merged = mergeItem(item, partial);
       items.set(item.id, merged);
@@ -71,7 +93,7 @@ export function applyMany(
 
   if (!changed) return { state, events: [] };
 
-  return { state: { items, edges: state.edges }, events: allEvents };
+  return { state: { items, edges: edges ?? state.edges }, events: allEvents };
 }
 
 export function bulkAdjustScores(
