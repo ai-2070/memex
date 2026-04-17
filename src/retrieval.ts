@@ -193,13 +193,20 @@ export function surfaceContradictions(
     itemMap.set(entry.item.id, entry);
   }
 
+  // Dedup by item id: multiple CONTRADICTS edges may connect the same pair
+  // (bidirectional or multi-edge), and a self-edge makes a === b. Without
+  // deduping, each item's contradicted_by list ends up with duplicates.
   for (const edge of contradictEdges) {
     const a = itemMap.get(edge.from);
     const b = itemMap.get(edge.to);
-    if (a && b) {
-      a.contradicted_by = a.contradicted_by ?? [];
+    if (!a || !b) continue;
+    if (a === b) continue; // ignore self-contradictions
+    a.contradicted_by = a.contradicted_by ?? [];
+    if (!a.contradicted_by.some((i) => i.id === b.item.id)) {
       a.contradicted_by.push(b.item);
-      b.contradicted_by = b.contradicted_by ?? [];
+    }
+    b.contradicted_by = b.contradicted_by ?? [];
+    if (!b.contradicted_by.some((i) => i.id === a.item.id)) {
       b.contradicted_by.push(a.item);
     }
   }

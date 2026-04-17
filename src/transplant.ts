@@ -374,6 +374,22 @@ export function importSlice(
   let currentIntent = intentState;
   let currentTask = taskState;
 
+  // --- memory re-id pre-pass ---
+  // Populate memIdMap BEFORE any memory is processed so that cross-references
+  // (e.g. parents) see the final ids regardless of slice ordering. Otherwise
+  // a child listed before its parent would keep the original (colliding)
+  // parent id because the map isn't yet populated when the child is processed.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const item of slice.memories) {
+      const existing = memState.items.get(item.id);
+      if (existing && !shallowEqual(existing as any, item as any)) {
+        const newId = reIdFor(item.id, allMemIds, item.created_at);
+        allMemIds.add(newId);
+        memIdMap.set(item.id, newId);
+      }
+    }
+  }
+
   // --- import memories ---
   for (const item of slice.memories) {
     const existing = currentMem.items.get(item.id);
@@ -381,9 +397,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, item as any)) {
           if (doReId) {
-            const newId = reIdFor(item.id, allMemIds, item.created_at);
-            allMemIds.add(newId);
-            memIdMap.set(item.id, newId);
+            const newId = memIdMap.get(item.id)!;
             const remapped: MemoryItem = {
               ...item,
               id: newId,
@@ -486,6 +500,20 @@ export function importSlice(
     report.created.edges.push(edge.edge_id);
   }
 
+  // --- intent re-id pre-pass ---
+  // Same rationale as the memory pre-pass: populate intentIdMap so that
+  // intent.parent_id references remap correctly regardless of slice ordering.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const intent of slice.intents) {
+      const existing = currentIntent.intents.get(intent.id);
+      if (existing && !shallowEqual(existing as any, intent as any)) {
+        const newId = reIdFor(intent.id, allIntentIds);
+        allIntentIds.add(newId);
+        intentIdMap.set(intent.id, newId);
+      }
+    }
+  }
+
   // --- import intents ---
   for (const intent of slice.intents) {
     const existing = currentIntent.intents.get(intent.id);
@@ -493,9 +521,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, intent as any)) {
           if (doReId) {
-            const newId = reIdFor(intent.id, allIntentIds);
-            allIntentIds.add(newId);
-            intentIdMap.set(intent.id, newId);
+            const newId = intentIdMap.get(intent.id)!;
             const remapped: Intent = {
               ...intent,
               id: newId,
@@ -551,6 +577,20 @@ export function importSlice(
     report.created.intents.push(intent.id);
   }
 
+  // --- task re-id pre-pass ---
+  // Same rationale as above: populate taskIdMap so task.parent_id references
+  // remap correctly regardless of slice ordering.
+  if (skipExisting && shallowCompare && doReId) {
+    for (const task of slice.tasks) {
+      const existing = currentTask.tasks.get(task.id);
+      if (existing && !shallowEqual(existing as any, task as any)) {
+        const newId = reIdFor(task.id, allTaskIds);
+        allTaskIds.add(newId);
+        taskIdMap.set(task.id, newId);
+      }
+    }
+  }
+
   // --- import tasks ---
   for (const task of slice.tasks) {
     const existing = currentTask.tasks.get(task.id);
@@ -558,9 +598,7 @@ export function importSlice(
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, task as any)) {
           if (doReId) {
-            const newId = reIdFor(task.id, allTaskIds);
-            allTaskIds.add(newId);
-            taskIdMap.set(task.id, newId);
+            const newId = taskIdMap.get(task.id)!;
             const remapped: Task = {
               ...task,
               id: newId,
