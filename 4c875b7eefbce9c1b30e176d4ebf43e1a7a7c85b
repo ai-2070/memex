@@ -1,0 +1,29 @@
+tests/retrieval.test.ts
+  78fadf25ee76bcc1 705-715
+src/retrieval.ts
+  78fadf25ee76bcc1 310
+src/integrity.ts
+  78fadf25ee76bcc1 370
+tests/integrity.test.ts
+  78fadf25ee76bcc1 393-403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "4c875b7eefbce9c1b30e176d4ebf43e1a7a7c85b",
+  "prompts": {
+    "78fadf25ee76bcc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3916d885-9680-4d73-9754-5e961588797e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 24,
+      "total_deletions": 2,
+      "accepted_lines": 24,
+      "overriden_lines": 0
+    }
+  }
+}

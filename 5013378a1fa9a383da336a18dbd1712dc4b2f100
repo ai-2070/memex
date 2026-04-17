@@ -1,0 +1,31 @@
+tests/bugfix-regressions.test.ts
+  78fadf25ee76bcc1 23-28,438-440,445,452,454,458,478,481,486-489,494-495,505,513,518-519,537,540,545-547,552,563-564,571,575,583-584,601
+tests/cross-graph-fields.test.ts
+  78fadf25ee76bcc1 28-33,282-283,290,302,308-309,328,331,336-338,345-346,357-358,363-365,383,386
+tests/bugfix-holes.test.ts
+  78fadf25ee76bcc1 44-49,206,212,221,233,237,511-517,527-533
+tests/transplant.test.ts
+  78fadf25ee76bcc1 17-22,339,343,347,362,365
+tests/bugfix-and-coverage.test.ts
+  78fadf25ee76bcc1 56-61,822-825,829,831,835-836,851,857,861-864,868,873,878-881
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "5013378a1fa9a383da336a18dbd1712dc4b2f100",
+  "prompts": {
+    "78fadf25ee76bcc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3916d885-9680-4d73-9754-5e961588797e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 126,
+      "total_deletions": 80,
+      "accepted_lines": 126,
+      "overriden_lines": 0
+    }
+  }
+}
