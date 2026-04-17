@@ -1,0 +1,27 @@
+src/transplant.ts
+  81204dc66d6516aa 34-35,246-276,285-286,340-353,361,464-477,485,541-554,562
+tests/bugfix-reid-ordering-and-deepeq.test.ts
+  81204dc66d6516aa 1-139,141-395
+src/query.ts
+  81204dc66d6516aa 152-154,157-161,165-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "3a3f512677af3d629ca671622852de20b80afee3",
+  "prompts": {
+    "81204dc66d6516aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10908d6e-3af2-495c-97b2-eea712855b3f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 488,
+      "total_deletions": 14,
+      "accepted_lines": 485,
+      "overriden_lines": 1
+    }
+  }
+}
