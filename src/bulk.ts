@@ -43,6 +43,10 @@ export function applyMany(
   // Cloned lazily: only pay for it if we actually retract something and
   // need to cascade edge cleanup.
   let edges: Map<string, Edge> | null = null;
+  // Reverse index (endpoint item id -> edge ids touching it), built lazily
+  // on first retract so we don't pay O(edges) up front for batches that are
+  // all updates, and we don't pay O(edges) per retract for large graphs.
+  let edgesByEndpoint: Map<string, string[]> | null = null;
   const allEvents: MemoryLifecycleEvent[] = [];
   let changed = false;
 
@@ -63,19 +67,34 @@ export function applyMany(
       // Mirror the reducer's memory.retract behavior: clean up edges that
       // reference the retracted item so bulk retraction doesn't leave dangling
       // edges behind.
-      if (edges === null) edges = new Map(state.edges);
-      for (const [edgeId, edge] of state.edges) {
-        if (
-          (edge.from === item.id || edge.to === item.id) &&
-          edges.has(edgeId)
-        ) {
-          edges.delete(edgeId);
-          allEvents.push({
-            namespace: "memory",
-            type: "edge.retracted",
-            edge,
-            cause_type: "memory.retract",
-          });
+      if (state.edges.size > 0) {
+        if (edges === null) edges = new Map(state.edges);
+        if (edgesByEndpoint === null) {
+          edgesByEndpoint = new Map<string, string[]>();
+          for (const [edgeId, edge] of state.edges) {
+            let list = edgesByEndpoint.get(edge.from);
+            if (!list) edgesByEndpoint.set(edge.from, (list = []));
+            list.push(edgeId);
+            if (edge.from !== edge.to) {
+              list = edgesByEndpoint.get(edge.to);
+              if (!list) edgesByEndpoint.set(edge.to, (list = []));
+              list.push(edgeId);
+            }
+          }
+        }
+        const incidentIds = edgesByEndpoint.get(item.id);
+        if (incidentIds) {
+          for (const edgeId of incidentIds) {
+            const edge = edges.get(edgeId);
+            if (!edge) continue; // already cleaned up by a prior retract
+            edges.delete(edgeId);
+            allEvents.push({
+              namespace: "memory",
+              type: "edge.retracted",
+              edge,
+              cause_type: "memory.retract",
+            });
+          }
         }
       }
     } else if (Object.keys(partial).length > 0) {

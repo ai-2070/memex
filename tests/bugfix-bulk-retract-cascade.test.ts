@@ -135,6 +135,33 @@ describe("applyMany cascades edge cleanup on retract", () => {
     expect(events.filter((e) => e.type === "edge.retracted")).toHaveLength(1);
   });
 
+  it("emits each item's edge.retracted events immediately after its memory.retracted", () => {
+    // Locks in the per-item interleaving the reducer's memory.retract
+    // produces when called in a loop. Callers concatenating events from
+    // multiple applyCommand(...)s get this ordering; applyMany should match.
+    const state = buildState(
+      [makeItem("m1"), makeItem("m2"), makeItem("m3"), makeItem("m4")],
+      [makeEdge("e1", "m1", "m2"), makeEdge("e2", "m3", "m4")],
+    );
+    const { events } = applyMany(
+      state,
+      { ids: ["m1", "m3"] },
+      () => null,
+      "system:cleanup",
+    );
+    // Expect [mem.retracted(m1), edge.retracted(e1), mem.retracted(m3), edge.retracted(e2)]
+    // — NOT [mem.retracted, mem.retracted, edge.retracted, edge.retracted].
+    expect(events).toHaveLength(4);
+    expect(events[0].type).toBe("memory.retracted");
+    expect(events[0].item!.id).toBe("m1");
+    expect(events[1].type).toBe("edge.retracted");
+    expect(events[1].edge!.edge_id).toBe("e1");
+    expect(events[2].type).toBe("memory.retracted");
+    expect(events[2].item!.id).toBe("m3");
+    expect(events[3].type).toBe("edge.retracted");
+    expect(events[3].edge!.edge_id).toBe("e2");
+  });
+
   it("does not clone edges when the batch has no retractions", () => {
     // Guard against a regression where we unconditionally clone edges,
     // defeating the lazy-clone optimization. We test observable behavior:
