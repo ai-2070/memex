@@ -1,0 +1,25 @@
+tests/bugfix-reid-ordering.test.ts
+  81204dc66d6516aa 1-240
+src/transplant.ts
+  81204dc66d6516aa 377-392,400,503-516,524,580-593,601
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "bfd20771363bcc155e00c76e4798bcd05b70fa3d",
+  "prompts": {
+    "81204dc66d6516aa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10908d6e-3af2-495c-97b2-eea712855b3f",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 316,
+      "total_deletions": 38,
+      "accepted_lines": 287,
+      "overriden_lines": 0
+    }
+  }
+}
