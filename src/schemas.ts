@@ -377,9 +377,7 @@ export const IntentCommandSchema: z.ZodType<IntentCommand> =
     z.object({
       type: z.literal("intent.update"),
       intent_id: z.string(),
-      partial: z.record(z.string(), z.unknown()) as z.ZodType<
-        Partial<Intent>
-      >,
+      partial: z.record(z.string(), z.unknown()) as z.ZodType<Partial<Intent>>,
       author: z.string(),
       reason: z.string().optional(),
     }),
@@ -470,8 +468,9 @@ export const TaskSchema: z.ZodType<Task> = z.object({
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const TaskCommandSchema: z.ZodType<TaskCommand> =
-  z.discriminatedUnion("type", [
+export const TaskCommandSchema: z.ZodType<TaskCommand> = z.discriminatedUnion(
+  "type",
+  [
     z.object({ type: z.literal("task.create"), task: TaskSchema }),
     z.object({
       type: z.literal("task.update"),
@@ -501,10 +500,11 @@ export const TaskCommandSchema: z.ZodType<TaskCommand> =
       task_id: z.string(),
       reason: z.string().optional(),
     }),
-  ]);
+  ],
+);
 
-export const TaskLifecycleEventSchema: z.ZodType<TaskLifecycleEvent> =
-  z.object({
+export const TaskLifecycleEventSchema: z.ZodType<TaskLifecycleEvent> = z.object(
+  {
     namespace: z.literal("task"),
     type: z.enum([
       "task.created",
@@ -516,7 +516,8 @@ export const TaskLifecycleEventSchema: z.ZodType<TaskLifecycleEvent> =
     ]),
     task: TaskSchema,
     cause_type: z.string(),
-  });
+  },
+);
 
 export const TaskFilterSchema: z.ZodType<TaskFilter> = z.object({
   intent_id: z.string().optional(),

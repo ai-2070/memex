@@ -138,7 +138,11 @@ describe("createEventEnvelope", () => {
   });
 
   it("uses custom namespace when provided", () => {
-    const env = createEventEnvelope("intent.create", { id: "i1" }, { namespace: "intent" });
+    const env = createEventEnvelope(
+      "intent.create",
+      { id: "i1" },
+      { namespace: "intent" },
+    );
     expect(env.namespace).toBe("intent");
   });
 
