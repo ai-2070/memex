@@ -2,7 +2,7 @@
 
 Multi-session continuity for AI systems.
 
-MemEX stores beliefs, evidence, conflicts, and updates -- not just retrieved text. It gives agents a continuous belief state across sessions instead of fragmented chat logs.
+MemEX stores beliefs, evidence, conflicts, and updates — not just retrieved text. It gives agents a continuous belief state across sessions instead of fragmented chat logs.
 
 ## The Problem
 
@@ -20,11 +20,11 @@ Most systems conflate "I can retrieve it" with "I know it." Retrieval is not mem
 
 MemEX is a typed, scored, provenance-tracked graph. Each memory item carries:
 
-- A **kind** -- what it is (observation, assertion, hypothesis, derivation, simulation, policy, trait)
-- A **source_kind** -- how it got here (user-stated, observed, inferred, imported)
-- Three **scores** -- authority (trust), conviction (author confidence), importance (attention priority)
-- **Parents** -- what items it was derived from, forming provenance chains
-- **Edges** -- typed relationships to other items (supports, contradicts, supersedes, alias)
+- A **kind** — what it is (observation, assertion, hypothesis, derivation, simulation, policy, trait)
+- A **source_kind** — how it got here (user-stated, observed, inferred, imported)
+- Three **scores** — authority (trust), conviction (author confidence), importance (attention priority)
+- **Parents** — what items it was derived from, forming provenance chains
+- **Edges** — typed relationships to other items (supports, contradicts, supersedes, alias)
 
 This means the system can:
 
@@ -37,7 +37,7 @@ This means the system can:
 
 ## Where MemEX Fits
 
-MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools -- it gives them something better to read from and write to.
+MemEX is the structured memory layer in a larger stack. It doesn't replace your other tools — it gives them something better to read from and write to.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -67,17 +67,17 @@ MemEX is the structured memory layer in a larger stack. It doesn't replace your 
 
 ### How the pieces connect
 
-**Chat window (sliding context)** -- the current conversation. As messages flow, the agent extracts observations, assertions, and preferences and writes them to MemEX. The chat window is ephemeral; MemEX is where things persist.
+**Chat window (sliding context)** — the current conversation. As messages flow, the agent extracts observations, assertions, and preferences and writes them to MemEX. The chat window is ephemeral; MemEX is where things persist.
 
-**Working memory (scratchpad)** -- short-lived, high-importance items the agent is actively reasoning about. These live in MemEX with `kind: "hypothesis"` or `kind: "assumption"` and high `importance`. After processing, their importance decays and they settle into long-term memory.
+**Working memory (scratchpad)** — short-lived, high-importance items the agent is actively reasoning about. These live in MemEX with `kind: "hypothesis"` or `kind: "assumption"` and high `importance`. After processing, their importance decays and they settle into long-term memory.
 
-**Vector / text search** -- MemEX stores structured items, not embeddings. Search tools subscribe to MemEX lifecycle events and maintain their own indexes. Search indexes are derived from MemEX, not the other way around.
+**Vector / text search** — MemEX stores structured items, not embeddings. Search tools subscribe to MemEX lifecycle events and maintain their own indexes. Search indexes are derived from MemEX, not the other way around.
 
-**Cognition layer** -- uses `getScoredItems` and `smartRetrieve` to build its thinking queue. Writes back inferred items, resolved contradictions, and updated scores. The agent prioritizes thinking using authority, conviction, and importance.
+**Cognition layer** — uses `getScoredItems` and `smartRetrieve` to build its thinking queue. Writes back inferred items, resolved contradictions, and updated scores. The agent prioritizes thinking using authority, conviction, and importance.
 
-**Event store** -- the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
+**Event store** — the append-only command log. MemEX emits lifecycle events that get persisted. On restart, `replayFromEnvelopes` rebuilds the graph from the log.
 
-MemEX is the system of record. It does not replace retrieval systems -- it governs them. Vector search and keyword search are recall tools; MemEX is the epistemic coordination layer that decides what matters, what conflicts, and what to include in context. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
+MemEX is the system of record. It does not replace retrieval systems — it governs them. Vector search and keyword search are recall tools; MemEX is the epistemic coordination layer that decides what matters, what conflicts, and what to include in context. The library itself is pure TypeScript with a single runtime dependency (`uuidv7`). Storage, search, and bus integration belong in the service layer above.
 
 ### What changes in agent behavior
 
@@ -204,7 +204,7 @@ These are orthogonal. A hypothesis can be high-importance (matters a lot) but lo
 
 ### Time Decay
 
-Scores decay over time at query time -- the stored values are not mutated. Configure decay per query:
+Scores decay over time at query time — the stored values are not mutated. Configure decay per query:
 
 ```ts
 { rate: 0.1, interval: "day", type: "exponential" }
@@ -214,11 +214,11 @@ Three types: **exponential** (smooth curve, never zero), **linear** (straight to
 
 ### Provenance
 
-Items can declare **parents** -- the items they were derived or inferred from. This creates provenance chains that let the system explain *why* it believes something:
+Items can declare **parents** — the items they were derived or inferred from. This creates provenance chains that let the system explain *why* it believes something:
 
 ```ts
 getSupportSet(state, claimId)
-// -> [claim, parent1, parent2, grandparent1] -- everything that justifies this claim
+// -> [claim, parent1, parent2, grandparent1] — everything that justifies this claim
 ```
 
 If a parent is retracted, `getStaleItems` finds orphaned children. `cascadeRetract` removes the entire dependency chain.
@@ -227,8 +227,8 @@ If a parent is retracted, `getStaleItems` finds orphaned children. `cascadeRetra
 
 When two items conflict, they can be linked with a `CONTRADICTS` edge. At retrieval time:
 
-- `contradictions: "filter"` -- keep the higher-scoring side (clean context)
-- `contradictions: "surface"` -- keep both, flagged with `contradicted_by` (agent reasoning)
+- `contradictions: "filter"` — keep the higher-scoring side (clean context)
+- `contradictions: "surface"` — keep both, flagged with `contradicted_by` (agent reasoning)
 
 Contradictions can be resolved: `resolveContradiction` creates a `SUPERSEDES` edge and lowers the loser's authority.
 
@@ -265,17 +265,17 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 
 ## Design Philosophy
 
-Every system encodes assumptions about truth, knowledge, and time -- whether it acknowledges them or not. MemEX makes those assumptions explicit.
+Every system encodes assumptions about truth, knowledge, and time — whether it acknowledges them or not. MemEX makes those assumptions explicit.
 
 | Question | Typical system | MemEX |
 |----------|---------------|-------|
 | What is knowledge? | Similar text (vectors) or structured facts (SQL) | Beliefs with provenance, confidence, and conflict |
 | What exists? | Documents, rows | Observations, hypotheses, derivations, policies, traits |
-| Is truth binary? | Yes (stored or not) | No -- graded by authority, conviction, and importance |
-| Does knowledge decay? | No (or manually pruned) | Yes -- query-time decay, configurable per retrieval |
+| Is truth binary? | Yes (stored or not) | No — graded by authority, conviction, and importance |
+| Does knowledge decay? | No (or manually pruned) | Yes — query-time decay, configurable per retrieval |
 | What about contradictions? | Overwrite or ignore | Represent, carry, and optionally resolve |
 
-Most memory systems compress and resolve -- they produce a single clean narrative. MemEX preserves and represents -- it maintains a field of competing claims that a reasoning layer can interpret. The graph is the pre-answer belief state, not the final answer.
+Most memory systems compress and resolve — they produce a single clean narrative. MemEX preserves and represents — it maintains a field of competing claims that a reasoning layer can interpret. The graph is the pre-answer belief state, not the final answer.
 
 This is a deliberate architectural choice. MemEX is not a thinking system. It is a substrate that makes thinking systems possible. Storage, search, and cognition belong above the library. MemEX provides the structured epistemic state they operate on.
 
@@ -287,7 +287,7 @@ MemEX contains three logical graphs in one package. Use what you need:
 
 | Graph | Purpose | Core type | Namespace |
 |-------|---------|-----------|-----------|
-| **Memory** | Epistemic state -- beliefs, evidence, contradictions | `MemoryItem` | `"memory"` |
+| **Memory** | Epistemic state — beliefs, evidence, contradictions | `MemoryItem` | `"memory"` |
 | **Intent** | Goals and objectives | `Intent` | `"intent"` |
 | **Task** | Units of work tied to intents | `Task` | `"task"` |
 
@@ -386,7 +386,7 @@ This is what `exportSlice` / `importSlice` enables at the library level. The tra
 
 | Pattern | How it works |
 |---------|-------------|
-| **Safe delegation** | Export a slice to a sub-agent. It operates on its own copy. Merge results back append-only -- no risk of corrupting the main graph. |
+| **Safe delegation** | Export a slice to a sub-agent. It operates on its own copy. Merge results back append-only — no risk of corrupting the main graph. |
 | **Parallel reasoning** | Fork belief state into multiple slices. Run different reasoning paths independently. Compare outcomes before merging. |
 | **Reproducibility** | Event logs + deterministic slices mean any state can be replayed, audited, or debugged after the fact. |
 | **State mobility** | Memory is not tied to one runtime. Export, serialize, move between agents or machines, rehydrate anywhere. |
@@ -398,7 +398,7 @@ Memory is no longer a local resource. It is portable belief.
 **Memory graph:**
 - Full query algebra: `and`, `or`, `not`, `range`, `ids`, `scope_prefix`, `parents` (includes/count), `intent_id`, `task_id`, `meta` (dot-path), `meta_has`, `created` (time range), `decay` (freshness filter)
 - Multi-sort with tiebreakers (authority, conviction, importance, recency)
-- Configurable time decay: exponential, linear, or step -- applied at query time, not stored
+- Configurable time decay: exponential, linear, or step — applied at query time, not stored
 - Scored retrieval with pre/post filters, min_score threshold, and decay
 - Smart retrieval: contradiction-aware packing + diversity penalties + budget limits
 - Budget-aware retrieval (greedy knapsack by score/cost)
@@ -531,7 +531,7 @@ MemEX supports different levels of detail at every stage of the memory lifecycle
 | **Thinking** | Direct facts + deterministic derivations | Multi-hop reasoning, contradiction surfacing, support tree traversal |
 | **Insertion** | Store summaries, mark details as low-importance | Store atomic events with full `DERIVED_FROM` chains |
 
-Resolution is controlled through the same primitives -- filters, score weights, and decay:
+Resolution is controlled through the same primitives — filters, score weights, and decay:
 
 ```ts
 // low resolution: only trusted, recent items
@@ -550,7 +550,7 @@ smartRetrieve(state, {
 });
 ```
 
-The agent decides resolution based on the task. A routine action uses low resolution. A decision with consequences uses high resolution. The same graph serves both -- no separate "fast" and "deep" memory stores.
+The agent decides resolution based on the task. A routine action uses low resolution. A decision with consequences uses high resolution. The same graph serves both — no separate "fast" and "deep" memory stores.
 
 ### Thinking Budget from Scores
 
@@ -560,7 +560,7 @@ The three scores can drive the thinking budget itself. Items that are important 
 thinking_priority = importance * (1 - authority)
 ```
 
-An item with `importance: 0.9` and `authority: 0.3` gets priority `0.63` -- high attention, uncertain, worth reasoning about. An item with `importance: 0.9` and `authority: 0.95` gets priority `0.045` -- important but already trusted, just use it.
+An item with `importance: 0.9` and `authority: 0.3` gets priority `0.63` — high attention, uncertain, worth reasoning about. An item with `importance: 0.9` and `authority: 0.95` gets priority `0.045` — important but already trusted, just use it.
 
 After the agent processes an item, reduce its importance:
 
@@ -623,4 +623,4 @@ See [API.md](./API.md) for the full API reference.
 
 ## License
 
-Apache 2.0 -- see [LICENSE](./LICENSE).
+Apache 2.0 — see [LICENSE](./LICENSE).
