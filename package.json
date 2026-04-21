@@ -1,7 +1,7 @@
 {
   "name": "@ai2070/memex",
   "version": "0.11.1",
-  "description": "MemEX memory layer — graph of memories and edges over an append-only event log",
+  "description": "MemEX memory layer — Multi-session continuity for AI systems",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
