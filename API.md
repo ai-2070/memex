@@ -17,9 +17,9 @@ interface MemoryItem {
   source_kind: SourceKind;       // how it got here
   parents?: string[];            // item ids this was derived/inferred from
 
-  authority: number;             // 0..1 -- how much should the system trust this?
-  conviction?: number;           // 0..1 -- how sure was the author?
-  importance?: number;           // 0..1 -- how much attention does this need right now? (salience)
+  authority: number;             // 0..1 — how much should the system trust this?
+  conviction?: number;           // 0..1 — how sure was the author?
+  importance?: number;           // 0..1 — how much attention does this need right now? (salience)
 
   intent_id?: string;            // intent that produced this item
   task_id?: string;              // task that produced this item
@@ -32,7 +32,7 @@ interface MemoryItem {
 }
 ```
 
-**`kind`** -- what the item is:
+**`kind`** — what the item is:
 
 | Kind | Meaning |
 |------|---------|
@@ -47,7 +47,7 @@ interface MemoryItem {
 
 Accepts arbitrary strings beyond the known set.
 
-**`source_kind`** -- how the item got here:
+**`source_kind`** — how the item got here:
 
 | Source Kind | Meaning |
 |-------------|---------|
@@ -554,7 +554,7 @@ Flattened, deduplicated set of all items in the provenance chain (including the 
 
 ```ts
 const support = getSupportSet(state, "m4");
-// [m4, m2, m1] -- everything needed to explain why m4 exists
+// [m4, m2, m1] — everything needed to explain why m4 exists
 ```
 
 ---
