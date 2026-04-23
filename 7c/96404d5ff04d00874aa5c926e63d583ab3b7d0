@@ -1,0 +1,29 @@
+src/integrity.ts
+  6720d633b6d40dae 211-218,221-222,224-241
+API.md
+  6720d633b6d40dae 733,766-770
+tests/bugfix-sweep.test.ts
+  6720d633b6d40dae 758-807
+README.md
+  6720d633b6d40dae 274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "7c96404d5ff04d00874aa5c926e63d583ab3b7d0",
+  "prompts": {
+    "6720d633b6d40dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4b44370-5718-4cb3-8f9d-e3768c740297",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 195,
+      "total_deletions": 21,
+      "accepted_lines": 195,
+      "overriden_lines": 0
+    }
+  }
+}
