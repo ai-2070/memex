@@ -323,6 +323,36 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
     }
   });
 
+  it("handles years 0000-0099 without Date.UTC's legacy coercion", () => {
+    // Date.UTC(50, 0, 1) silently maps to 1950; setUTCFullYear must bypass
+    // that so an ISO timestamp "0050-01-01" sorts before "1950-01-01".
+    const oldEnv: EventEnvelope<MemoryCommand> = {
+      id: "a",
+      namespace: "memory",
+      type: "memory.create",
+      ts: "0050-01-01T00:00:00Z",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-000000000120"),
+      },
+    };
+    const modernEnv: EventEnvelope<MemoryCommand> = {
+      id: "b",
+      namespace: "memory",
+      type: "memory.create",
+      ts: "1950-01-01T00:00:00Z",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-000000000121"),
+      },
+    };
+    // Pass modern first to force a sort reorder if the two-digit bug returns.
+    const { events } = replayFromEnvelopes([modernEnv, oldEnv]);
+    expect((events[0] as { item: MemoryItem }).item.id).toBe(
+      "01900000-0000-7000-8000-000000000120", // year 0050 comes first
+    );
+  });
+
   it("accepts Feb 29 in a leap year", () => {
     const env: EventEnvelope<MemoryCommand> = {
       id: "e",
