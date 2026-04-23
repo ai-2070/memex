@@ -502,13 +502,12 @@ describe("getItemsByBudget with zero-cost items", () => {
       makeItem("m3", { authority: 0.7 }),
     ]);
 
-    expect(() =>
-      getItemsByBudget(state, {
-        budget: 5,
-        costFn: () => 0,
-        weights: { authority: 1 },
-      }),
-    ).toThrow(RangeError);
+    const result = getItemsByBudget(state, {
+      budget: 5,
+      costFn: () => 0,
+      weights: { authority: 1 },
+    });
+    expect(result).toHaveLength(3);
   });
 
   it("mixes zero-cost and positive-cost items correctly", () => {
@@ -518,10 +517,22 @@ describe("getItemsByBudget with zero-cost items", () => {
       makeItem("m3", { authority: 0.7 }),
     ]);
 
+    const result = getItemsByBudget(state, {
+      budget: 2,
+      costFn: (item) => (item.id === "m2" ? 0 : 1),
+      weights: { authority: 1 },
+    });
+    const ids = result.map((r) => r.item.id).sort();
+    // m1 (cost 1), m2 (cost 0), m3 (cost 1) — all fit within budget 2.
+    expect(ids).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("rejects negative cost", () => {
+    const state = stateWith([makeItem("m1", { authority: 0.9 })]);
     expect(() =>
       getItemsByBudget(state, {
-        budget: 2,
-        costFn: (item) => (item.id === "m2" ? 0 : 1),
+        budget: 5,
+        costFn: () => -1,
         weights: { authority: 1 },
       }),
     ).toThrow(RangeError);

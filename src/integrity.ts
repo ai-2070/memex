@@ -48,6 +48,9 @@ export function markContradiction(
   author: string,
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
+  // A self-CONTRADICTS edge is meaningful: it represents an internally
+  // inconsistent/tainted item. Downstream (surfaceContradictions) already
+  // skips self-edges during annotation, so the edge is safe to record.
   return applyCommand(state, {
     type: "edge.create",
     edge: {
@@ -106,9 +109,9 @@ export function resolveContradiction(
   }
 
   if (toRetract.length === 0) {
-    throw new Error(
-      `No active CONTRADICTS edge between ${winnerId} and ${loserId}`,
-    );
+    // Nothing to resolve — this is a stale or duplicate call, not a
+    // structural violation. No-op rather than crash the fold.
+    return { state: current, events: allEvents };
   }
 
   // create SUPERSEDES edge
@@ -205,26 +208,56 @@ export function cascadeRetract(
   author: string,
   reason?: string,
 ): { state: GraphState; events: MemoryLifecycleEvent[]; retracted: string[] } {
-  const dependents = getDependents(state, itemId, true);
+  // Iterative DFS post-order traversal: a valid topological sort (leaves
+  // before roots) for DAGs with shared children, cycle-safe, and does not
+  // consume JS call stack on deep dependency chains.
+  //
+  // Pre-mark the root as visited so any cycle that points back to it is
+  // ignored — the root is retracted separately at the end of this function,
+  // never prematurely as part of the descendants list.
+  const visited = new Set<string>([itemId]);
+  const order: string[] = [];
+
+  type Frame = { id: string; phase: "enter" | "exit" };
+  const stack: Frame[] = [];
+  for (const child of getChildren(state, itemId)) {
+    stack.push({ id: child.id, phase: "enter" });
+  }
+
+  while (stack.length > 0) {
+    const frame = stack.pop()!;
+    if (frame.phase === "exit") {
+      order.push(frame.id);
+      continue;
+    }
+    if (visited.has(frame.id)) continue;
+    visited.add(frame.id);
+    // Push exit first so it's processed after all children (post-order).
+    stack.push({ id: frame.id, phase: "exit" });
+    for (const child of getChildren(state, frame.id)) {
+      if (!visited.has(child.id)) {
+        stack.push({ id: child.id, phase: "enter" });
+      }
+    }
+  }
+
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];
   const retracted: string[] = [];
 
-  // retract dependents first (leaves before roots)
-  for (const dep of dependents.reverse()) {
-    if (!current.items.has(dep.id)) continue;
+  for (const depId of order) {
+    if (!current.items.has(depId)) continue;
     const r = applyCommand(current, {
       type: "memory.retract",
-      item_id: dep.id,
+      item_id: depId,
       author,
       reason: reason ?? `parent ${itemId} retracted`,
     });
     current = r.state;
     allEvents.push(...r.events);
-    retracted.push(dep.id);
+    retracted.push(depId);
   }
 
-  // retract the item itself
   if (current.items.has(itemId)) {
     const r = applyCommand(current, {
       type: "memory.retract",
@@ -255,6 +288,11 @@ export function markAlias(
   author: string,
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
+  if (itemIdA === itemIdB) {
+    // Self-alias is redundant (an item is trivially aliased to itself)
+    // and would only pollute `getAliases` output. No-op rather than throw.
+    return { state, events: [] };
+  }
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];
 
@@ -367,14 +405,15 @@ export function getItemsByBudget(
 
   for (const entry of scored) {
     const cost = options.costFn(entry.item);
-    if (!(cost > 0)) {
-      throw new RangeError(`costFn must return a positive number, got ${cost}`);
+    if (cost < 0 || !Number.isFinite(cost)) {
+      throw new RangeError(
+        `costFn must return a finite non-negative number, got ${cost}`,
+      );
     }
     if (cost <= remaining) {
       results.push(entry);
       remaining -= cost;
     }
-    if (remaining <= 0) break;
   }
 
   return results;

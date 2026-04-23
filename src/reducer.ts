@@ -39,6 +39,7 @@ export function mergeItem(
     content: partialContent,
     meta: partialMeta,
     id: _id,
+    created_at: _createdAt,
     ...rest
   } = partial;
   return {

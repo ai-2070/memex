@@ -25,3 +25,10 @@ export class DuplicateEdgeError extends Error {
     this.name = "DuplicateEdgeError";
   }
 }
+
+export class InvalidTimestampError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidTimestampError";
+  }
+}

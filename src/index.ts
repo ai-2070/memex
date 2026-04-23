@@ -38,6 +38,7 @@ export {
   EdgeNotFoundError,
   DuplicateMemoryError,
   DuplicateEdgeError,
+  InvalidTimestampError,
 } from "./errors.js";
 export { applyCommand } from "./reducer.js";
 export {
@@ -60,6 +61,7 @@ export {
   wrapEdgeStateEvent,
 } from "./envelope.js";
 export { replayCommands, replayFromEnvelopes } from "./replay.js";
+export type { ReplayFailure } from "./replay.js";
 export {
   getContradictions,
   markContradiction,

@@ -121,6 +121,22 @@ interface GraphState {
 
 ---
 
+## Errors
+
+All typed errors subclass `Error` and set `.name` so they're catchable by both `instanceof` and name checks.
+
+| Error | Thrown by | When |
+|-------|-----------|------|
+| `MemoryNotFoundError` | `applyCommand` (`memory.update`, `memory.retract`) | Target item doesn't exist |
+| `EdgeNotFoundError` | `applyCommand` (`edge.update`, `edge.retract`) | Target edge doesn't exist |
+| `DuplicateMemoryError` | `applyCommand` (`memory.create`) | Item id already exists |
+| `DuplicateEdgeError` | `applyCommand` (`edge.create`) | Edge id already exists |
+| `InvalidTimestampError` | `extractTimestamp`, envelope `ts` parsing | Malformed UUIDv7 or ISO 8601 string |
+
+Bulk replay functions never re-throw these — they collect them in `skipped: ReplayFailure[]` and continue. See [Replay](#replay).
+
+---
+
 ## Factories
 
 ### createMemoryItem(input)
@@ -140,7 +156,9 @@ const item = createMemoryItem({
 
 ### createEdge(input)
 
-Creates an `Edge` with auto-generated `edge_id`. Defaults `active` to `true`.
+Creates an `Edge` with auto-generated `edge_id` and `active: true` by default. Validates score fields are in [0, 1].
+
+**Self-referencing edges** (`from === to`) are permitted. They represent meaningful graph anomalies (e.g. a self-CONTRADICTS marks an internally inconsistent item) and are tolerated by downstream traversal code.
 
 ### createEventEnvelope(type, payload, opts?)
 
@@ -184,7 +202,7 @@ const { state, events } = applyCommand(state, {
 - `content` is shallow-merged (`{ ...existing.content, ...partial.content }`)
 - `meta` is shallow-merged (`{ ...existing.meta, ...partial.meta }`)
 - `undefined` values in partials are ignored (field is not changed)
-- `id` in partials is ignored (cannot change item identity)
+- `id` and `created_at` in partials are ignored (identity and creation time are immutable)
 - All other fields are replaced
 
 **Errors:** `DuplicateMemoryError`, `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError`.
@@ -380,11 +398,20 @@ Returns items that have the given item in their `parents`.
 
 ### extractTimestamp(uuidv7Id)
 
-Extracts millisecond unix timestamp from a uuidv7 id.
+Extracts millisecond unix timestamp from a uuidv7 id. Throws `InvalidTimestampError` if the argument is not a valid UUIDv7 — callers at an API boundary are expected to fix their input.
 
 ```ts
 const ms = extractTimestamp(item.id);
 const date = new Date(ms);
+
+// typed + catchable
+try {
+  extractTimestamp(userInput);
+} catch (err) {
+  if (err instanceof InvalidTimestampError) {
+    // log + drop; don't crash the daemon
+  }
+}
 ```
 
 ---
@@ -463,6 +490,10 @@ const context = getItemsByBudget(state, {
 });
 ```
 
+**Cost semantics:**
+- `costFn` may return `0` — zero-cost items (cached, free, ephemeral) are always included regardless of remaining budget.
+- Negative or non-finite costs throw `RangeError`.
+
 ---
 
 ## Smart Retrieval
@@ -498,6 +529,8 @@ const context = smartRetrieve(state, {
   diversity: { author_penalty: 0.3, parent_penalty: 0.2 },
 });
 ```
+
+Same cost semantics as `getItemsByBudget`: `costFn` may return `0` (free items always included); negative or non-finite costs throw `RangeError`.
 
 ### filterContradictions(state, scored)
 
@@ -615,16 +648,27 @@ Note: for query-time decay without mutating stored values, use `ScoreWeights.dec
 
 ## Graph Integrity
 
+MemEX is tolerant of noisy input. Graph-mutation helpers below never throw on
+degenerate shapes (self-references, stale resolves) — they record, flag, or
+silently no-op so the fold can continue. Only API-boundary helpers throw, and
+they throw typed errors that callers are expected to catch.
+
 ### Conflict Detection & Resolution
 
 ```ts
-// mark two items as contradicting
+// mark two items as contradicting.
+// itemIdA === itemIdB is ALLOWED and recorded as a self-CONTRADICTS edge:
+// it represents an internally inconsistent / tainted item. Downstream
+// `surfaceContradictions` skips self-edges during annotation.
 markContradiction(state, itemIdA, itemIdB, author, meta?)
 
 // find all active contradictions
 getContradictions(state) -> Contradiction[]
 
-// resolve: winner supersedes loser, loser authority lowered
+// resolve: winner supersedes loser, loser authority lowered.
+// If no active CONTRADICTS edge exists between them, this is a silent no-op
+// (returns { state, events: [] }) — a stale or duplicate resolve is not a
+// structural violation and should not crash the pipeline.
 resolveContradiction(state, winnerId, loserId, author, reason?)
 ```
 
@@ -637,7 +681,9 @@ getStaleItems(state) -> StaleItem[]
 // get direct or transitive dependents
 getDependents(state, itemId, transitive?) -> MemoryItem[]
 
-// retract an item and all its transitive dependents
+// retract an item and all its transitive dependents.
+// Retraction uses DFS post-order so shared descendants are retracted
+// before their parents (valid topological order for DAGs, cycle-safe).
 cascadeRetract(state, itemId, author, reason?)
   -> { state, events, retracted: string[] }
 ```
@@ -645,7 +691,9 @@ cascadeRetract(state, itemId, author, reason?)
 ### Identity / Aliasing
 
 ```ts
-// mark two items as referring to the same entity (bidirectional)
+// mark two items as referring to the same entity (bidirectional).
+// itemIdA === itemIdB is a silent no-op: a self-alias is redundant and
+// would only pollute getAliases output.
 markAlias(state, itemIdA, itemIdB, author, meta?)
 
 // direct aliases
@@ -654,6 +702,12 @@ getAliases(state, itemId) -> MemoryItem[]
 // transitive closure (full identity group)
 getAliasGroup(state, itemId) -> MemoryItem[]
 ```
+
+### Self-referencing edges
+
+`createEdge({ from: x, to: x })` is permitted. Self-edges carry meaning (e.g.
+a self-CONTRADICTS marks an internally inconsistent item) and are tolerated
+by traversal code. Higher layers decide how to interpret them.
 
 ---
 
@@ -675,13 +729,56 @@ Creates a `state.edge` envelope.
 
 ## Replay
 
+Bulk replay is **integrity-tolerant**. Individual bad items (unparsable
+timestamps, duplicate ids, missing items on update) are collected in a `skipped` list
+rather than aborting the batch — a long-running daemon keeps running.
+
+```ts
+interface ReplayFailure {
+  index: number;                            // position in the input array
+  command?: MemoryCommand;                  // populated for replayCommands
+  envelope?: EventEnvelope<MemoryCommand>;  // populated for replayFromEnvelopes
+  error: Error;                             // typed; e.g. InvalidTimestampError, DuplicateMemoryError
+}
+```
+
 ### replayCommands(commands)
 
-Folds an array of `MemoryCommand` from an empty state. Returns final state and all lifecycle events.
+Folds an array of `MemoryCommand` from an empty state. Returns:
+
+```ts
+{ state, events, skipped: ReplayFailure[] }
+```
+
+Commands that throw (`DuplicateMemoryError`, `MemoryNotFoundError`, etc.) are
+added to `skipped` and the rest of the batch continues.
 
 ### replayFromEnvelopes(envelopes)
 
-Sorts `EventEnvelope<MemoryCommand>[]` by timestamp, extracts payloads, replays.
+Sorts `EventEnvelope<MemoryCommand>[]` chronologically, extracts payloads, replays.
+
+- Envelope `ts` must be strict ISO 8601: `YYYY-MM-DDTHH:mm:ss[.SSS](Z|±HH:MM)`.
+  Sub-millisecond precision, impossible calendar dates (e.g. `2024-02-31`),
+  and non-ISO formats are rejected as `InvalidTimestampError` and collected
+  in `skipped` — NOT thrown.
+- Years `0000–0099` are parsed correctly (the implementation bypasses
+  `Date.UTC`'s legacy two-digit-year coercion).
+- Apply-time failures that the reducer raises — `DuplicateMemoryError`,
+  `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError` — are
+  also collected in `skipped`. Note the reducer does **not** validate that
+  a `memory.create`'s `parents` exist, so missing-parent references pass
+  through silently; detect those via `getStaleItems(state)` after replay.
+
+Returns `{ state, events, skipped: ReplayFailure[] }`.
+
+```ts
+const { state, skipped } = replayFromEnvelopes(envelopes);
+if (skipped.length > 0) {
+  for (const failure of skipped) {
+    logger.warn({ err: failure.error, ts: failure.envelope?.ts });
+  }
+}
+```
 
 ---
 
