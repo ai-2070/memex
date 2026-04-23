@@ -1,0 +1,25 @@
+src/replay.ts
+  6720d633b6d40dae 26-42,46-48
+tests/bugfix-sweep.test.ts
+  6720d633b6d40dae 77-123,248-295
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "e42cbcd1575ddc2a610dbdb2134e1eb3872da3b2",
+  "prompts": {
+    "6720d633b6d40dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4b44370-5718-4cb3-8f9d-e3768c740297",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 115,
+      "total_deletions": 11,
+      "accepted_lines": 115,
+      "overriden_lines": 0
+    }
+  }
+}
