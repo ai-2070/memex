@@ -23,21 +23,64 @@ export function replayCommands(commands: MemoryCommand[]): {
   return { state, events: allEvents };
 }
 
-// Canonical ISO 8601 with a "Z" or "±HH:MM" offset. `Date.parse` is only
-// spec-reliable for this shape; we reject anything else so replay ordering is
-// deterministic across runtimes.
+// Strict ISO 8601 with milliseconds-only precision and an explicit offset.
+// Sub-millisecond precision is rejected because Date.UTC drops it, which
+// would collapse distinct timestamps and break chronological replay. We also
+// validate calendar fields manually so that impossible dates like 2024-02-31
+// don't silently normalize under Date.parse.
 const ISO_8601_RE =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:Z|([+-])(\d{2}):(\d{2}))$/;
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month === 2) return isLeapYear(year) ? 29 : 28;
+  if (month === 4 || month === 6 || month === 9 || month === 11) return 30;
+  return 31;
+}
 
 function parseIsoTs(ts: string): number {
-  if (!ISO_8601_RE.test(ts)) {
+  const m = ISO_8601_RE.exec(ts);
+  if (!m) {
     throw new Error(`Invalid envelope timestamp: "${ts}" (expected ISO 8601)`);
   }
-  const parsed = Date.parse(ts);
-  if (Number.isNaN(parsed)) {
-    throw new Error(`Invalid envelope timestamp: "${ts}"`);
+  const year = +m[1];
+  const month = +m[2];
+  const day = +m[3];
+  const hour = +m[4];
+  const minute = +m[5];
+  const second = +m[6];
+  const ms = m[7] ? +m[7].padEnd(3, "0") : 0;
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth(year, month) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    throw new Error(
+      `Invalid envelope timestamp: "${ts}" (calendar fields out of range)`,
+    );
   }
-  return parsed;
+
+  let epoch = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+
+  if (m[8]) {
+    const offH = +m[9];
+    const offM = +m[10];
+    if (offH > 23 || offM > 59) {
+      throw new Error(`Invalid envelope timestamp: "${ts}" (bad offset)`);
+    }
+    const sign = m[8] === "-" ? 1 : -1;
+    epoch += sign * (offH * 60 + offM) * 60 * 1000;
+  }
+
+  return epoch;
 }
 
 export function replayFromEnvelopes(

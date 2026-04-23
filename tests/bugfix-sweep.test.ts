@@ -270,6 +270,73 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
     }
   });
 
+  it("rejects sub-millisecond precision so distinct timestamps do not collapse", () => {
+    // `Date.parse` silently truncates anything past the milliseconds place,
+    // which would collapse these two distinct instants to the same epoch ms
+    // and break chronological replay order.
+    for (const bad of [
+      "2024-01-01T00:00:00.0001Z",
+      "2024-01-01T00:00:00.000001Z",
+      "2024-01-01T00:00:00.000000001Z",
+    ]) {
+      const env: EventEnvelope<MemoryCommand> = {
+        id: "e",
+        namespace: "memory",
+        type: "memory.create",
+        ts: bad,
+        payload: {
+          type: "memory.create",
+          item: mkItem("01900000-0000-7000-8000-000000000110"),
+        },
+      };
+      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+    }
+  });
+
+  it("rejects impossible calendar dates that Date.parse would normalize", () => {
+    // Date.parse("2024-02-31T00:00:00Z") returns a valid number (March 2),
+    // which would replay the envelope under the wrong date. Reject outright.
+    for (const bad of [
+      "2024-02-30T00:00:00Z",
+      "2024-02-31T00:00:00Z",
+      "2023-02-29T00:00:00Z", // not a leap year
+      "2024-13-01T00:00:00Z",
+      "2024-00-01T00:00:00Z",
+      "2024-04-31T00:00:00Z", // April has 30 days
+      "2024-01-32T00:00:00Z",
+      "2024-01-00T00:00:00Z",
+      "2024-01-01T24:00:00Z",
+      "2024-01-01T00:60:00Z",
+      "2024-01-01T00:00:61Z",
+    ]) {
+      const env: EventEnvelope<MemoryCommand> = {
+        id: "e",
+        namespace: "memory",
+        type: "memory.create",
+        ts: bad,
+        payload: {
+          type: "memory.create",
+          item: mkItem("01900000-0000-7000-8000-000000000111"),
+        },
+      };
+      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+    }
+  });
+
+  it("accepts Feb 29 in a leap year", () => {
+    const env: EventEnvelope<MemoryCommand> = {
+      id: "e",
+      namespace: "memory",
+      type: "memory.create",
+      ts: "2024-02-29T12:00:00.500Z",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-000000000112"),
+      },
+    };
+    expect(() => replayFromEnvelopes([env])).not.toThrow();
+  });
+
   it("accepts ISO 8601 with Z and with numeric offset", () => {
     const envZ: EventEnvelope<MemoryCommand> = {
       id: "a",
