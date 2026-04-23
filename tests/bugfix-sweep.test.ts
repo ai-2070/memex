@@ -755,6 +755,56 @@ describe("bugfix-sweep: cascadeRetract produces a valid topological order for DA
     // Must terminate, and must retract both.
     expect(res.state.items.size).toBe(0);
   });
+
+  it("handles cycles that point back to the root without retracting root prematurely", () => {
+    // A is the root. B is a child of A. A is listed as a child of B (cycle
+    // back through the root). A must be retracted LAST — the pre-marked
+    // visited set prevents the cycle from re-adding A into the descendants
+    // ordering.
+    const A = "01900000-0000-7000-8000-000000000510";
+    const B = "01900000-0000-7000-8000-000000000511";
+
+    const a = mkItem(A, { parents: [B] });
+    const b = mkItem(B, { parents: [A] });
+    const state = {
+      items: new Map([
+        [A, a],
+        [B, b],
+      ]),
+      edges: new Map(),
+    };
+
+    const res = cascadeRetract(state, A, "tester");
+    // A must be the final retract; B must come first.
+    expect(res.retracted).toEqual([B, A]);
+    expect(res.state.items.size).toBe(0);
+  });
+
+  it("handles deep dependency chains without stack overflow", () => {
+    // A chain of 20,000 nodes would blow the JS call stack on a recursive
+    // DFS (node default ~10k frames). The iterative traversal should fly.
+    const N = 20_000;
+    const ids: string[] = [];
+    const items = new Map();
+    for (let i = 0; i < N; i++) {
+      const id = `chain-${i.toString().padStart(6, "0")}`;
+      ids.push(id);
+      const item = mkItem(id, {
+        created_at: 1_700_000_000_000 + i,
+        parents: i === 0 ? undefined : [ids[i - 1]],
+      });
+      items.set(id, item);
+    }
+    const state = { items, edges: new Map() };
+
+    const res = cascadeRetract(state, ids[0], "tester");
+    // Every descendant plus the root should be retracted.
+    expect(res.retracted).toHaveLength(N);
+    // Root is last; leaf (N-1) is first.
+    expect(res.retracted[res.retracted.length - 1]).toBe(ids[0]);
+    expect(res.retracted[0]).toBe(ids[N - 1]);
+    expect(res.state.items.size).toBe(0);
+  });
 });
 
 describe("bugfix-sweep: createEventEnvelope still produces parseable timestamps", () => {

@@ -730,7 +730,7 @@ Creates a `state.edge` envelope.
 ## Replay
 
 Bulk replay is **integrity-tolerant**. Individual bad items (unparsable
-timestamps, duplicate ids, missing parents) are collected in a `skipped` list
+timestamps, duplicate ids, missing items on update) are collected in a `skipped` list
 rather than aborting the batch — a long-running daemon keeps running.
 
 ```ts
@@ -763,8 +763,11 @@ Sorts `EventEnvelope<MemoryCommand>[]` chronologically, extracts payloads, repla
   in `skipped` — NOT thrown.
 - Years `0000–0099` are parsed correctly (the implementation bypasses
   `Date.UTC`'s legacy two-digit-year coercion).
-- Apply-time failures (duplicate id, missing parent) are also collected in
-  `skipped`.
+- Apply-time failures that the reducer raises — `DuplicateMemoryError`,
+  `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError` — are
+  also collected in `skipped`. Note the reducer does **not** validate that
+  a `memory.create`'s `parents` exist, so missing-parent references pass
+  through silently; detect those via `getStaleItems(state)` after replay.
 
 Returns `{ state, events, skipped: ReplayFailure[] }`.
 

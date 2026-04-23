@@ -271,7 +271,7 @@ MemEX is a memory graph for noisy agent outputs and background reasoning, not a 
 |-------|----------|
 | **Graph mutations** (`markAlias`, `markContradiction`, `resolveContradiction`, `createEdge`) | Never throw on degenerate shapes. Self-alias is a silent no-op; self-contradiction is recorded as a meaningful "internally inconsistent" marker; resolving a nonexistent contradiction is a no-op. The fold survives noisy input. |
 | **API boundary** (`extractTimestamp`, envelope `ts` parsing) | Throw typed, catchable errors (`InvalidTimestampError`). The caller is expected to fix their input. |
-| **Bulk replay** (`replayCommands`, `replayFromEnvelopes`) | Integrity-tolerant. Per-item failures (unparsable timestamps, duplicate ids, missing parents) are collected in a `skipped: ReplayFailure[]` list rather than aborting the batch. A long-running daemon keeps running. |
+| **Bulk replay** (`replayCommands`, `replayFromEnvelopes`) | Integrity-tolerant. Per-item failures (unparsable timestamps, duplicate ids, updates targeting nonexistent items) are collected in a `skipped: ReplayFailure[]` list rather than aborting the batch. A long-running daemon keeps running. |
 
 ```ts
 const { state, events, skipped } = replayFromEnvelopes(envelopes);

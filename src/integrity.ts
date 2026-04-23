@@ -208,26 +208,37 @@ export function cascadeRetract(
   author: string,
   reason?: string,
 ): { state: GraphState; events: MemoryLifecycleEvent[]; retracted: string[] } {
-  // DFS post-order traversal gives a valid topological sort (leaves before
-  // roots) even when descendants form a DAG with shared children.
-  const visited = new Set<string>();
-  const onStack = new Set<string>();
+  // Iterative DFS post-order traversal: a valid topological sort (leaves
+  // before roots) for DAGs with shared children, cycle-safe, and does not
+  // consume JS call stack on deep dependency chains.
+  //
+  // Pre-mark the root as visited so any cycle that points back to it is
+  // ignored — the root is retracted separately at the end of this function,
+  // never prematurely as part of the descendants list.
+  const visited = new Set<string>([itemId]);
   const order: string[] = [];
 
-  const visit = (id: string): void => {
-    if (visited.has(id)) return;
-    if (onStack.has(id)) return; // cycle: break without revisiting
-    onStack.add(id);
-    for (const child of getChildren(state, id)) {
-      visit(child.id);
-    }
-    onStack.delete(id);
-    visited.add(id);
-    order.push(id);
-  };
-
+  type Frame = { id: string; phase: "enter" | "exit" };
+  const stack: Frame[] = [];
   for (const child of getChildren(state, itemId)) {
-    visit(child.id);
+    stack.push({ id: child.id, phase: "enter" });
+  }
+
+  while (stack.length > 0) {
+    const frame = stack.pop()!;
+    if (frame.phase === "exit") {
+      order.push(frame.id);
+      continue;
+    }
+    if (visited.has(frame.id)) continue;
+    visited.add(frame.id);
+    // Push exit first so it's processed after all children (post-order).
+    stack.push({ id: frame.id, phase: "exit" });
+    for (const child of getChildren(state, frame.id)) {
+      if (!visited.has(child.id)) {
+        stack.push({ id: child.id, phase: "enter" });
+      }
+    }
   }
 
   let current = state;
