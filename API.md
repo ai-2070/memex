@@ -121,6 +121,22 @@ interface GraphState {
 
 ---
 
+## Errors
+
+All typed errors subclass `Error` and set `.name` so they're catchable by both `instanceof` and name checks.
+
+| Error | Thrown by | When |
+|-------|-----------|------|
+| `MemoryNotFoundError` | `applyCommand` (`memory.update`, `memory.retract`) | Target item doesn't exist |
+| `EdgeNotFoundError` | `applyCommand` (`edge.update`, `edge.retract`) | Target edge doesn't exist |
+| `DuplicateMemoryError` | `applyCommand` (`memory.create`) | Item id already exists |
+| `DuplicateEdgeError` | `applyCommand` (`edge.create`) | Edge id already exists |
+| `InvalidTimestampError` | `extractTimestamp`, envelope `ts` parsing | Malformed UUIDv7 or ISO 8601 string |
+
+Bulk replay functions never re-throw these — they collect them in `skipped: ReplayFailure[]` and continue. See [Replay](#replay).
+
+---
+
 ## Factories
 
 ### createMemoryItem(input)
@@ -140,7 +156,9 @@ const item = createMemoryItem({
 
 ### createEdge(input)
 
-Creates an `Edge` with auto-generated `edge_id`. Defaults `active` to `true`.
+Creates an `Edge` with auto-generated `edge_id` and `active: true` by default. Validates score fields are in [0, 1].
+
+**Self-referencing edges** (`from === to`) are permitted. They represent meaningful graph anomalies (e.g. a self-CONTRADICTS marks an internally inconsistent item) and are tolerated by downstream traversal code.
 
 ### createEventEnvelope(type, payload, opts?)
 
@@ -187,7 +205,7 @@ const { state, events } = applyCommand(state, {
 - `id` and `created_at` in partials are ignored (identity and creation time are immutable)
 - All other fields are replaced
 
-**Errors:** `DuplicateMemoryError`, `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError`, `InvalidTimestampError`.
+**Errors:** `DuplicateMemoryError`, `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError`.
 
 ---
 
@@ -472,6 +490,10 @@ const context = getItemsByBudget(state, {
 });
 ```
 
+**Cost semantics:**
+- `costFn` may return `0` — zero-cost items (cached, free, ephemeral) are always included regardless of remaining budget.
+- Negative or non-finite costs throw `RangeError`.
+
 ---
 
 ## Smart Retrieval
@@ -507,6 +529,8 @@ const context = smartRetrieve(state, {
   diversity: { author_penalty: 0.3, parent_penalty: 0.2 },
 });
 ```
+
+Same cost semantics as `getItemsByBudget`: `costFn` may return `0` (free items always included); negative or non-finite costs throw `RangeError`.
 
 ### filterContradictions(state, scored)
 
