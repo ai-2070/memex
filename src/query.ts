@@ -11,6 +11,7 @@ import type {
   ScoreWeights,
   ScoredItem,
 } from "./types.js";
+import { InvalidTimestampError } from "./errors.js";
 
 function resolvePath(obj: unknown, path: string): unknown {
   let current = obj;
@@ -181,7 +182,7 @@ function safeExtractTimestamp(id: string): number | null {
 export function extractTimestamp(uuidv7Id: string): number {
   const ts = safeExtractTimestamp(uuidv7Id);
   if (ts === null) {
-    throw new Error(
+    throw new InvalidTimestampError(
       `Cannot extract timestamp: "${uuidv7Id}" is not a valid UUIDv7`,
     );
   }
@@ -191,7 +192,7 @@ export function extractTimestamp(uuidv7Id: string): number {
 function itemTimestamp(item: MemoryItem): number {
   const ts = item.created_at ?? safeExtractTimestamp(item.id);
   if (ts === null || ts === undefined) {
-    throw new Error(
+    throw new InvalidTimestampError(
       `Cannot determine timestamp for item "${item.id}": set created_at or use a UUIDv7 id`,
     );
   }

@@ -6,21 +6,43 @@ import type {
 } from "./types.js";
 import { createGraphState } from "./graph.js";
 import { applyCommand } from "./reducer.js";
+import { InvalidTimestampError } from "./errors.js";
+
+/**
+ * A command or envelope that failed during replay. The rest of the batch
+ * proceeds — bulk replay is an integrity-tolerant operation.
+ */
+export interface ReplayFailure {
+  index: number;
+  command?: MemoryCommand;
+  envelope?: EventEnvelope<MemoryCommand>;
+  error: Error;
+}
 
 export function replayCommands(commands: MemoryCommand[]): {
   state: GraphState;
   events: MemoryLifecycleEvent[];
+  skipped: ReplayFailure[];
 } {
   let state = createGraphState();
   const allEvents: MemoryLifecycleEvent[] = [];
+  const skipped: ReplayFailure[] = [];
 
-  for (const cmd of commands) {
-    const result = applyCommand(state, cmd);
-    state = result.state;
-    allEvents.push(...result.events);
+  for (let i = 0; i < commands.length; i++) {
+    try {
+      const result = applyCommand(state, commands[i]);
+      state = result.state;
+      allEvents.push(...result.events);
+    } catch (err) {
+      skipped.push({
+        index: i,
+        command: commands[i],
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
   }
 
-  return { state, events: allEvents };
+  return { state, events: allEvents, skipped };
 }
 
 // Strict ISO 8601 with milliseconds-only precision and an explicit offset.
@@ -44,7 +66,9 @@ function daysInMonth(year: number, month: number): number {
 function parseIsoTs(ts: string): number {
   const m = ISO_8601_RE.exec(ts);
   if (!m) {
-    throw new Error(`Invalid envelope timestamp: "${ts}" (expected ISO 8601)`);
+    throw new InvalidTimestampError(
+      `Invalid envelope timestamp: "${ts}" (expected ISO 8601)`,
+    );
   }
   const year = +m[1];
   const month = +m[2];
@@ -63,7 +87,7 @@ function parseIsoTs(ts: string): number {
     minute > 59 ||
     second > 59
   ) {
-    throw new Error(
+    throw new InvalidTimestampError(
       `Invalid envelope timestamp: "${ts}" (calendar fields out of range)`,
     );
   }
@@ -80,7 +104,9 @@ function parseIsoTs(ts: string): number {
     const offH = +m[9];
     const offM = +m[10];
     if (offH > 23 || offM > 59) {
-      throw new Error(`Invalid envelope timestamp: "${ts}" (bad offset)`);
+      throw new InvalidTimestampError(
+        `Invalid envelope timestamp: "${ts}" (bad offset)`,
+      );
     }
     const sign = m[8] === "-" ? 1 : -1;
     epoch += sign * (offH * 60 + offM) * 60 * 1000;
@@ -91,9 +117,52 @@ function parseIsoTs(ts: string): number {
 
 export function replayFromEnvelopes(
   envelopes: EventEnvelope<MemoryCommand>[],
-): { state: GraphState; events: MemoryLifecycleEvent[] } {
-  const indexed = envelopes.map((env) => ({ env, ts: parseIsoTs(env.ts) }));
-  indexed.sort((a, b) => a.ts - b.ts);
-  const commands = indexed.map(({ env }) => env.payload);
-  return replayCommands(commands);
+): {
+  state: GraphState;
+  events: MemoryLifecycleEvent[];
+  skipped: ReplayFailure[];
+} {
+  const skipped: ReplayFailure[] = [];
+  const sortable: {
+    env: EventEnvelope<MemoryCommand>;
+    ts: number;
+    index: number;
+  }[] = [];
+
+  for (let i = 0; i < envelopes.length; i++) {
+    try {
+      sortable.push({
+        env: envelopes[i],
+        ts: parseIsoTs(envelopes[i].ts),
+        index: i,
+      });
+    } catch (err) {
+      skipped.push({
+        index: i,
+        envelope: envelopes[i],
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  }
+
+  sortable.sort((a, b) => a.ts - b.ts);
+
+  let state = createGraphState();
+  const allEvents: MemoryLifecycleEvent[] = [];
+
+  for (const { env, index } of sortable) {
+    try {
+      const result = applyCommand(state, env.payload);
+      state = result.state;
+      allEvents.push(...result.events);
+    } catch (err) {
+      skipped.push({
+        index,
+        envelope: env,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    }
+  }
+
+  return { state, events: allEvents, skipped };
 }

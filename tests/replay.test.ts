@@ -76,7 +76,7 @@ describe("replayCommands", () => {
     expect(state.edges.size).toBe(1);
   });
 
-  it("throws at point of failure for invalid command", () => {
+  it("collects per-command failures as skipped entries rather than crashing", () => {
     const commands: MemoryCommand[] = [
       { type: "memory.create", item: item1 },
       {
@@ -85,8 +85,14 @@ describe("replayCommands", () => {
         partial: { authority: 0.1 },
         author: "test",
       },
+      { type: "memory.create", item: item2 },
     ];
-    expect(() => replayCommands(commands)).toThrow(MemoryNotFoundError);
+    const { state, skipped } = replayCommands(commands);
+    // First and third commands succeed; the bad update is collected.
+    expect(state.items.size).toBe(2);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].index).toBe(1);
+    expect(skipped[0].error).toBeInstanceOf(MemoryNotFoundError);
   });
 });
 

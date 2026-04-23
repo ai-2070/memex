@@ -7,10 +7,18 @@ import { smartRetrieve, getSupportSet } from "../src/retrieval.js";
 import {
   markAlias,
   markContradiction,
+  resolveContradiction,
   cascadeRetract,
+  getAliases,
   getItemsByBudget,
 } from "../src/integrity.js";
-import { replayFromEnvelopes } from "../src/replay.js";
+import { createEdge } from "../src/helpers.js";
+import {
+  InvalidTimestampError,
+  MemoryNotFoundError,
+  DuplicateMemoryError,
+} from "../src/errors.js";
+import { replayFromEnvelopes, replayCommands } from "../src/replay.js";
 import { exportSlice, importSlice } from "../src/transplant.js";
 import { createIntentState } from "../src/intent.js";
 import { createTaskState } from "../src/task.js";
@@ -231,7 +239,7 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
     expect((events[1] as { item: MemoryItem }).item.id).toBe(id1);
   });
 
-  it("throws on unparsable timestamps", () => {
+  it("collects unparsable timestamps in the skipped list instead of throwing", () => {
     const env: EventEnvelope<MemoryCommand> = {
       id: "e",
       namespace: "memory",
@@ -242,13 +250,26 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
         item: mkItem("01900000-0000-7000-8000-000000000103"),
       },
     };
-    const env2 = { ...env, id: "f", ts: "2024-01-01T00:00:00Z" };
-    expect(() => replayFromEnvelopes([env, env2])).toThrow();
+    const env2: EventEnvelope<MemoryCommand> = {
+      ...env,
+      id: "f",
+      ts: "2024-01-01T00:00:00Z",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-0000000001aa"),
+      },
+    };
+    const { state, skipped } = replayFromEnvelopes([env, env2]);
+    // Good envelope applied, bad one collected — pipeline did not crash.
+    expect(state.items.size).toBe(1);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].envelope).toBe(env);
+    expect(skipped[0].error.name).toBe("InvalidTimestampError");
   });
 
-  it("rejects non-ISO timestamps that Date.parse would accept non-deterministically", () => {
+  it("skips non-ISO timestamps that Date.parse would accept non-deterministically", () => {
     // Formats like "Jan 1, 2024" or "2024/01/01" parse on V8 but are
-    // implementation-defined. Reject them up front.
+    // implementation-defined. Reject them up front and collect as skipped.
     for (const bad of [
       "Jan 1, 2024",
       "2024/01/01 10:00:00",
@@ -266,14 +287,16 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
           item: mkItem("01900000-0000-7000-8000-000000000104"),
         },
       };
-      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+      const { skipped } = replayFromEnvelopes([env]);
+      expect(skipped, bad).toHaveLength(1);
+      expect(skipped[0].error.name, bad).toBe("InvalidTimestampError");
     }
   });
 
-  it("rejects sub-millisecond precision so distinct timestamps do not collapse", () => {
+  it("skips sub-millisecond precision so distinct timestamps do not collapse", () => {
     // `Date.parse` silently truncates anything past the milliseconds place,
-    // which would collapse these two distinct instants to the same epoch ms
-    // and break chronological replay order.
+    // which would collapse distinct instants to the same epoch ms and break
+    // chronological replay order.
     for (const bad of [
       "2024-01-01T00:00:00.0001Z",
       "2024-01-01T00:00:00.000001Z",
@@ -289,11 +312,12 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
           item: mkItem("01900000-0000-7000-8000-000000000110"),
         },
       };
-      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+      const { skipped } = replayFromEnvelopes([env]);
+      expect(skipped, bad).toHaveLength(1);
     }
   });
 
-  it("rejects impossible calendar dates that Date.parse would normalize", () => {
+  it("skips impossible calendar dates that Date.parse would normalize", () => {
     // Date.parse("2024-02-31T00:00:00Z") returns a valid number (March 2),
     // which would replay the envelope under the wrong date. Reject outright.
     for (const bad of [
@@ -319,7 +343,8 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
           item: mkItem("01900000-0000-7000-8000-000000000111"),
         },
       };
-      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+      const { skipped } = replayFromEnvelopes([env]);
+      expect(skipped, bad).toHaveLength(1);
     }
   });
 
@@ -347,7 +372,8 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
       },
     };
     // Pass modern first to force a sort reorder if the two-digit bug returns.
-    const { events } = replayFromEnvelopes([modernEnv, oldEnv]);
+    const { events, skipped } = replayFromEnvelopes([modernEnv, oldEnv]);
+    expect(skipped).toHaveLength(0);
     expect((events[0] as { item: MemoryItem }).item.id).toBe(
       "01900000-0000-7000-8000-000000000120", // year 0050 comes first
     );
@@ -421,48 +447,244 @@ describe("bugfix-sweep: mergeItem does not allow rewriting created_at", () => {
   });
 });
 
-describe("bugfix-sweep: markAlias / markContradiction reject self-reference", () => {
-  it("markAlias throws when both ids are equal", () => {
+describe("bugfix-sweep: markAlias / markContradiction soft-handle self-reference", () => {
+  it("markAlias(a,a) is a silent no-op (self-alias is redundant)", () => {
     const id = "01900000-0000-7000-8000-000000000301";
     let state = createGraphState();
     state = applyCommand(state, {
       type: "memory.create",
       item: mkItem(id),
     }).state;
-    expect(() => markAlias(state, id, id, "tester")).toThrow();
+    const before = state;
+    const result = markAlias(state, id, id, "tester");
+    // Nothing recorded, state unchanged — no ALIAS edges polluting getAliases.
+    expect(result.events).toHaveLength(0);
+    expect(result.state).toBe(before);
   });
 
-  it("markContradiction throws when both ids are equal", () => {
+  it("markContradiction(a,a) records the self-edge (internal inconsistency)", () => {
     const id = "01900000-0000-7000-8000-000000000302";
     let state = createGraphState();
     state = applyCommand(state, {
       type: "memory.create",
       item: mkItem(id),
     }).state;
-    expect(() => markContradiction(state, id, id, "tester")).toThrow();
+    const result = markContradiction(state, id, id, "tester");
+    // A self-CONTRADICTS edge is a meaningful marker: "this item is tainted".
+    expect(result.events).toHaveLength(1);
+    const contradictEdges = Array.from(result.state.edges.values()).filter(
+      (e) => e.kind === "CONTRADICTS",
+    );
+    expect(contradictEdges).toHaveLength(1);
+    expect(contradictEdges[0].from).toBe(id);
+    expect(contradictEdges[0].to).toBe(id);
+  });
+
+  it("markAlias(a,a) does not pollute getAliases output", () => {
+    const id = "01900000-0000-7000-8000-000000000303";
+    let state = createGraphState();
+    state = applyCommand(state, {
+      type: "memory.create",
+      item: mkItem(id),
+    }).state;
+    state = markAlias(state, id, id, "tester").state;
+    expect(getAliases(state, id)).toEqual([]);
+  });
+});
+
+describe("bugfix-sweep: soft-failure semantics (record-and-continue)", () => {
+  it("createEdge permits self-referencing edges", () => {
+    const edge = createEdge({
+      from: "m1",
+      to: "m1",
+      kind: "CONTRADICTS",
+      author: "agent:detector",
+      source_kind: "derived_deterministic",
+      authority: 1,
+    });
+    expect(edge.from).toBe("m1");
+    expect(edge.to).toBe("m1");
+    expect(edge.edge_id).toBeTypeOf("string");
+    expect(edge.active).toBe(true);
+  });
+
+  it("resolveContradiction is a no-op when no CONTRADICTS edge exists", () => {
+    const a = "01900000-0000-7000-8000-000000000401";
+    const b = "01900000-0000-7000-8000-000000000402";
+    let state = createGraphState();
+    state = applyCommand(state, {
+      type: "memory.create",
+      item: mkItem(a, { authority: 0.9 }),
+    }).state;
+    state = applyCommand(state, {
+      type: "memory.create",
+      item: mkItem(b, { authority: 0.7 }),
+    }).state;
+
+    const result = resolveContradiction(state, a, b, "agent:resolver");
+    // Nothing should have happened: no SUPERSEDES edge, no authority change.
+    expect(result.events).toHaveLength(0);
+    expect(result.state.items.get(a)!.authority).toBe(0.9);
+    expect(result.state.items.get(b)!.authority).toBe(0.7);
+    const supersedes = Array.from(result.state.edges.values()).filter(
+      (e) => e.kind === "SUPERSEDES",
+    );
+    expect(supersedes).toHaveLength(0);
+  });
+
+  it("resolveContradiction handles duplicate calls gracefully", () => {
+    const a = "01900000-0000-7000-8000-000000000403";
+    const b = "01900000-0000-7000-8000-000000000404";
+    let state = createGraphState();
+    state = applyCommand(state, {
+      type: "memory.create",
+      item: mkItem(a, { authority: 0.9 }),
+    }).state;
+    state = applyCommand(state, {
+      type: "memory.create",
+      item: mkItem(b, { authority: 0.7 }),
+    }).state;
+    state = markContradiction(state, a, b, "detector").state;
+
+    // First resolve succeeds, second is a stale duplicate.
+    const r1 = resolveContradiction(state, a, b, "agent:resolver");
+    expect(r1.events.length).toBeGreaterThan(0);
+    const r2 = resolveContradiction(r1.state, a, b, "agent:resolver");
+    expect(r2.events).toHaveLength(0); // no crash, no-op
+    expect(r2.state).toBe(r1.state);
+  });
+});
+
+describe("bugfix-sweep: bulk replay is soft — log-and-continue, not crash", () => {
+  it("mix of good and bad envelopes produces a partial state + skipped list", () => {
+    const good1 = mkItem("01900000-0000-7000-8000-000000000701");
+    const good2 = mkItem("01900000-0000-7000-8000-000000000702");
+    const envs: EventEnvelope<MemoryCommand>[] = [
+      {
+        id: "a",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "2024-01-01T00:00:00Z",
+        payload: { type: "memory.create", item: good1 },
+      },
+      {
+        id: "b",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "garbage",
+        payload: { type: "memory.create", item: mkItem("x") },
+      },
+      {
+        id: "c",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "2024-01-02T00:00:00Z",
+        payload: { type: "memory.create", item: good2 },
+      },
+    ];
+    const { state, skipped } = replayFromEnvelopes(envs);
+    expect(state.items.size).toBe(2);
+    expect(state.items.has(good1.id)).toBe(true);
+    expect(state.items.has(good2.id)).toBe(true);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].error).toBeInstanceOf(InvalidTimestampError);
+  });
+
+  it("records apply failures (e.g. DuplicateMemoryError) without aborting", () => {
+    const item = mkItem("01900000-0000-7000-8000-000000000703");
+    const envs: EventEnvelope<MemoryCommand>[] = [
+      {
+        id: "a",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "2024-01-01T00:00:00Z",
+        payload: { type: "memory.create", item },
+      },
+      {
+        id: "b",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "2024-01-02T00:00:00Z",
+        payload: { type: "memory.create", item }, // duplicate id
+      },
+      {
+        id: "c",
+        namespace: "memory",
+        type: "memory.create",
+        ts: "2024-01-03T00:00:00Z",
+        payload: {
+          type: "memory.create",
+          item: mkItem("01900000-0000-7000-8000-000000000704"),
+        },
+      },
+    ];
+    const { state, skipped } = replayFromEnvelopes(envs);
+    expect(state.items.size).toBe(2);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].error).toBeInstanceOf(DuplicateMemoryError);
+  });
+
+  it("replayCommands collects per-command failures and continues", () => {
+    const item1 = mkItem("01900000-0000-7000-8000-000000000705");
+    const item2 = mkItem("01900000-0000-7000-8000-000000000706");
+    const commands: MemoryCommand[] = [
+      { type: "memory.create", item: item1 },
+      {
+        type: "memory.update",
+        item_id: "missing",
+        partial: { authority: 0.1 },
+        author: "tester",
+      },
+      { type: "memory.create", item: item2 },
+    ];
+    const { state, skipped } = replayCommands(commands);
+    expect(state.items.size).toBe(2);
+    expect(skipped).toHaveLength(1);
+    expect(skipped[0].index).toBe(1);
+    expect(skipped[0].error).toBeInstanceOf(MemoryNotFoundError);
+  });
+
+  it("empty input returns empty skipped list", () => {
+    const r1 = replayFromEnvelopes([]);
+    expect(r1.skipped).toEqual([]);
+    const r2 = replayCommands([]);
+    expect(r2.skipped).toEqual([]);
   });
 });
 
 describe("bugfix-sweep: extractTimestamp requires a true UUIDv7", () => {
-  it("rejects malformed 16-character strings", () => {
-    expect(() => extractTimestamp("abcdefghijkl7mno")).toThrow();
+  it("rejects malformed 16-character strings with InvalidTimestampError", () => {
+    expect(() => extractTimestamp("abcdefghijkl7mno")).toThrow(
+      InvalidTimestampError,
+    );
   });
 
   it("rejects non-hex characters even with correct length", () => {
     const id = "zzzzzzzz-zzzz-7zzz-8zzz-zzzzzzzzzzzz";
-    expect(() => extractTimestamp(id)).toThrow();
+    expect(() => extractTimestamp(id)).toThrow(InvalidTimestampError);
   });
 
   it("rejects UUIDs with the wrong version byte", () => {
-    // v4 UUID shape
     const id = "00000000-0000-4000-8000-000000000000";
-    expect(() => extractTimestamp(id)).toThrow();
+    expect(() => extractTimestamp(id)).toThrow(InvalidTimestampError);
   });
 
   it("accepts a well-formed UUIDv7", () => {
     // 0x018bbd1b3000 == 1_699_684_757_504 ms
     const id = "018bbd1b-3000-7000-8000-000000000000";
     expect(extractTimestamp(id)).toBe(1_699_684_757_504);
+  });
+
+  it("thrown error is an Error subclass so generic catch still works", () => {
+    let caught: unknown;
+    try {
+      extractTimestamp("not-a-uuid");
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toBeInstanceOf(InvalidTimestampError);
+    expect((caught as Error).name).toBe("InvalidTimestampError");
   });
 });
 

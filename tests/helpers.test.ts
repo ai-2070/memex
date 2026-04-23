@@ -115,10 +115,11 @@ describe("createEdge", () => {
     expect(edge.weight).toBe(0.5);
   });
 
-  it("throws Error when from equals to (self-referencing edge)", () => {
-    expect(() => createEdge({ ...base, from: "m1", to: "m1" })).toThrow(
-      "Self-referencing edge not allowed",
-    );
+  it("allows self-referencing edges (MemEX records anomalies, does not crash)", () => {
+    const edge = createEdge({ ...base, from: "m1", to: "m1" });
+    expect(edge.from).toBe("m1");
+    expect(edge.to).toBe("m1");
+    expect(edge.active).toBe(true);
   });
 });
 

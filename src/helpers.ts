@@ -51,11 +51,10 @@ export function createEdge(
     active?: boolean;
   },
 ): Edge {
-  if (input.from === input.to) {
-    throw new Error(
-      `Self-referencing edge not allowed: from and to are both "${input.from}"`,
-    );
-  }
+  // Self-referencing edges are permitted. They carry meaning (e.g. a self
+  // CONTRADICTS marks an internally inconsistent item) and MemEX is supposed
+  // to tolerate noisy input rather than crash the fold over one degenerate
+  // event. Downstream traversal/dedup code already handles them.
   validateScore(input.authority, "authority");
   validateScore(input.weight, "weight");
 

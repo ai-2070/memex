@@ -48,11 +48,9 @@ export function markContradiction(
   author: string,
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
-  if (itemIdA === itemIdB) {
-    throw new Error(
-      `Self-contradiction not allowed: both ids are "${itemIdA}"`,
-    );
-  }
+  // A self-CONTRADICTS edge is meaningful: it represents an internally
+  // inconsistent/tainted item. Downstream (surfaceContradictions) already
+  // skips self-edges during annotation, so the edge is safe to record.
   return applyCommand(state, {
     type: "edge.create",
     edge: {
@@ -111,9 +109,9 @@ export function resolveContradiction(
   }
 
   if (toRetract.length === 0) {
-    throw new Error(
-      `No active CONTRADICTS edge between ${winnerId} and ${loserId}`,
-    );
+    // Nothing to resolve — this is a stale or duplicate call, not a
+    // structural violation. No-op rather than crash the fold.
+    return { state: current, events: allEvents };
   }
 
   // create SUPERSEDES edge
@@ -280,7 +278,9 @@ export function markAlias(
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
   if (itemIdA === itemIdB) {
-    throw new Error(`Self-alias not allowed: both ids are "${itemIdA}"`);
+    // Self-alias is redundant (an item is trivially aliased to itself)
+    // and would only pollute `getAliases` output. No-op rather than throw.
+    return { state, events: [] };
   }
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];

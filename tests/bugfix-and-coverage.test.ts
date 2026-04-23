@@ -375,15 +375,17 @@ describe("decay interval validation", () => {
 // ============================================================
 
 describe("resolveContradiction edge cases", () => {
-  it("throws when no CONTRADICTS edge exists between the items", () => {
+  it("no-ops when no CONTRADICTS edge exists between the items", () => {
     const state = stateWith([
       makeItem("m1", { authority: 0.9 }),
       makeItem("m2", { authority: 0.7 }),
     ]);
-    // no markContradiction first — calling resolve directly should throw
-    expect(() =>
-      resolveContradiction(state, "m1", "m2", "system:resolver"),
-    ).toThrow(/No active CONTRADICTS edge/);
+    // No markContradiction first — resolve should be a silent no-op,
+    // not crash the fold. Stale/duplicate resolves are expected traffic.
+    const result = resolveContradiction(state, "m1", "m2", "system:resolver");
+    expect(result.events).toHaveLength(0);
+    expect(result.state.items.get("m1")!.authority).toBe(0.9);
+    expect(result.state.items.get("m2")!.authority).toBe(0.7);
   });
 });
 
