@@ -333,7 +333,6 @@ export function smartRetrieve(
       results.push(entry);
       remaining -= cost;
     }
-    if (remaining <= 0) break;
   }
 
   return results;

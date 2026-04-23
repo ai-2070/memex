@@ -74,6 +74,53 @@ describe("bugfix-sweep: smartRetrieve / getItemsByBudget accept zero-cost items"
     });
     expect(out.length).toBe(1);
   });
+
+  it("smartRetrieve still includes zero-cost items after budget exhaustion", () => {
+    // Two expensive items fill the budget, then three free items must still
+    // be included. The old `remaining <= 0` early-break would have skipped
+    // every zero-cost entry after the budget hit zero.
+    let state = createGraphState();
+    const ids = [
+      "01900000-0000-7000-8000-00000000f001",
+      "01900000-0000-7000-8000-00000000f002",
+      "01900000-0000-7000-8000-00000000f003",
+      "01900000-0000-7000-8000-00000000f004",
+      "01900000-0000-7000-8000-00000000f005",
+    ];
+    // Give expensive items higher importance so they sort first.
+    for (let i = 0; i < ids.length; i++) {
+      const item = mkItem(ids[i], { importance: i < 2 ? 0.9 : 0.5 });
+      state = applyCommand(state, { type: "memory.create", item }).state;
+    }
+    const expensive = new Set([ids[0], ids[1]]);
+    const out = smartRetrieve(state, {
+      budget: 10,
+      costFn: (item) => (expensive.has(item.id) ? 5 : 0),
+      weights: { importance: 1 },
+    });
+    // All 5 items fit: 5 + 5 + 0 + 0 + 0.
+    expect(out.length).toBe(5);
+  });
+
+  it("getItemsByBudget still includes zero-cost items after budget exhaustion", () => {
+    let state = createGraphState();
+    const ids = [
+      "01900000-0000-7000-8000-00000000b001",
+      "01900000-0000-7000-8000-00000000b002",
+      "01900000-0000-7000-8000-00000000b003",
+    ];
+    for (let i = 0; i < ids.length; i++) {
+      const item = mkItem(ids[i], { authority: i === 0 ? 0.9 : 0.5 });
+      state = applyCommand(state, { type: "memory.create", item }).state;
+    }
+    const out = getItemsByBudget(state, {
+      budget: 5,
+      // First item costs exactly the budget, the rest are free.
+      costFn: (item) => (item.id === ids[0] ? 5 : 0),
+      weights: { authority: 1 },
+    });
+    expect(out.length).toBe(3);
+  });
 });
 
 describe("bugfix-sweep: transplant shallowEqual handles nested arrays", () => {
@@ -197,6 +244,54 @@ describe("bugfix-sweep: replayFromEnvelopes sorts chronologically, not lexically
     };
     const env2 = { ...env, id: "f", ts: "2024-01-01T00:00:00Z" };
     expect(() => replayFromEnvelopes([env, env2])).toThrow();
+  });
+
+  it("rejects non-ISO timestamps that Date.parse would accept non-deterministically", () => {
+    // Formats like "Jan 1, 2024" or "2024/01/01" parse on V8 but are
+    // implementation-defined. Reject them up front.
+    for (const bad of [
+      "Jan 1, 2024",
+      "2024/01/01 10:00:00",
+      "2024-01-01 10:00:00Z", // space instead of T
+      "2024-01-01T10:00:00", // missing offset
+      "2024-01-01T10:00:00+0200", // offset without colon
+    ]) {
+      const env: EventEnvelope<MemoryCommand> = {
+        id: "e",
+        namespace: "memory",
+        type: "memory.create",
+        ts: bad,
+        payload: {
+          type: "memory.create",
+          item: mkItem("01900000-0000-7000-8000-000000000104"),
+        },
+      };
+      expect(() => replayFromEnvelopes([env]), bad).toThrow();
+    }
+  });
+
+  it("accepts ISO 8601 with Z and with numeric offset", () => {
+    const envZ: EventEnvelope<MemoryCommand> = {
+      id: "a",
+      namespace: "memory",
+      type: "memory.create",
+      ts: "2024-01-01T00:00:00.000Z",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-000000000105"),
+      },
+    };
+    const envOffset: EventEnvelope<MemoryCommand> = {
+      id: "b",
+      namespace: "memory",
+      type: "memory.create",
+      ts: "2024-01-01T02:00:00+02:00",
+      payload: {
+        type: "memory.create",
+        item: mkItem("01900000-0000-7000-8000-000000000106"),
+      },
+    };
+    expect(() => replayFromEnvelopes([envZ, envOffset])).not.toThrow();
   });
 });
 

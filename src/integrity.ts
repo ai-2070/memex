@@ -403,7 +403,6 @@ export function getItemsByBudget(
       results.push(entry);
       remaining -= cost;
     }
-    if (remaining <= 0) break;
   }
 
   return results;
