@@ -1,0 +1,41 @@
+tests/replay.test.ts
+  6720d633b6d40dae 79,88,90-95
+src/helpers.ts
+  6720d633b6d40dae 54-57
+src/query.ts
+  6720d633b6d40dae 14,185,195
+src/integrity.ts
+  6720d633b6d40dae 51-53,112-114,281-283
+src/errors.ts
+  6720d633b6d40dae 28-34
+src/replay.ts
+  6720d633b6d40dae 9-20,25,29,31-42,45,69-71,90,107-109,120-128,130-136,138-167
+tests/bugfix-and-coverage.test.ts
+  6720d633b6d40dae 378,383-388
+src/index.ts
+  6720d633b6d40dae 41,64
+tests/bugfix-sweep.test.ts
+  6720d633b6d40dae 10,12,15-21,242,253-267,270,272,290-292,296,298-299,315-316,320,346-347,375-376,450-451,458-462,465,472-651,656-659,664,669,677-687
+tests/helpers.test.ts
+  6720d633b6d40dae 118-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "626bfc133eb3582c4dda65336b2144c0f3c0dbb7",
+  "prompts": {
+    "6720d633b6d40dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4b44370-5718-4cb3-8f9d-e3768c740297",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 365,
+      "total_deletions": 64,
+      "accepted_lines": 371,
+      "overriden_lines": 2
+    }
+  }
+}
