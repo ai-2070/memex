@@ -184,10 +184,10 @@ const { state, events } = applyCommand(state, {
 - `content` is shallow-merged (`{ ...existing.content, ...partial.content }`)
 - `meta` is shallow-merged (`{ ...existing.meta, ...partial.meta }`)
 - `undefined` values in partials are ignored (field is not changed)
-- `id` in partials is ignored (cannot change item identity)
+- `id` and `created_at` in partials are ignored (identity and creation time are immutable)
 - All other fields are replaced
 
-**Errors:** `DuplicateMemoryError`, `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError`.
+**Errors:** `DuplicateMemoryError`, `MemoryNotFoundError`, `DuplicateEdgeError`, `EdgeNotFoundError`, `InvalidTimestampError`.
 
 ---
 
@@ -380,11 +380,20 @@ Returns items that have the given item in their `parents`.
 
 ### extractTimestamp(uuidv7Id)
 
-Extracts millisecond unix timestamp from a uuidv7 id.
+Extracts millisecond unix timestamp from a uuidv7 id. Throws `InvalidTimestampError` if the argument is not a valid UUIDv7 — callers at an API boundary are expected to fix their input.
 
 ```ts
 const ms = extractTimestamp(item.id);
 const date = new Date(ms);
+
+// typed + catchable
+try {
+  extractTimestamp(userInput);
+} catch (err) {
+  if (err instanceof InvalidTimestampError) {
+    // log + drop; don't crash the daemon
+  }
+}
 ```
 
 ---
@@ -615,16 +624,27 @@ Note: for query-time decay without mutating stored values, use `ScoreWeights.dec
 
 ## Graph Integrity
 
+MemEX is tolerant of noisy input. Graph-mutation helpers below never throw on
+degenerate shapes (self-references, stale resolves) — they record, flag, or
+silently no-op so the fold can continue. Only API-boundary helpers throw, and
+they throw typed errors that callers are expected to catch.
+
 ### Conflict Detection & Resolution
 
 ```ts
-// mark two items as contradicting
+// mark two items as contradicting.
+// itemIdA === itemIdB is ALLOWED and recorded as a self-CONTRADICTS edge:
+// it represents an internally inconsistent / tainted item. Downstream
+// `surfaceContradictions` skips self-edges during annotation.
 markContradiction(state, itemIdA, itemIdB, author, meta?)
 
 // find all active contradictions
 getContradictions(state) -> Contradiction[]
 
-// resolve: winner supersedes loser, loser authority lowered
+// resolve: winner supersedes loser, loser authority lowered.
+// If no active CONTRADICTS edge exists between them, this is a silent no-op
+// (returns { state, events: [] }) — a stale or duplicate resolve is not a
+// structural violation and should not crash the pipeline.
 resolveContradiction(state, winnerId, loserId, author, reason?)
 ```
 
@@ -637,7 +657,9 @@ getStaleItems(state) -> StaleItem[]
 // get direct or transitive dependents
 getDependents(state, itemId, transitive?) -> MemoryItem[]
 
-// retract an item and all its transitive dependents
+// retract an item and all its transitive dependents.
+// Retraction uses DFS post-order so shared descendants are retracted
+// before their parents (valid topological order for DAGs, cycle-safe).
 cascadeRetract(state, itemId, author, reason?)
   -> { state, events, retracted: string[] }
 ```
@@ -645,7 +667,9 @@ cascadeRetract(state, itemId, author, reason?)
 ### Identity / Aliasing
 
 ```ts
-// mark two items as referring to the same entity (bidirectional)
+// mark two items as referring to the same entity (bidirectional).
+// itemIdA === itemIdB is a silent no-op: a self-alias is redundant and
+// would only pollute getAliases output.
 markAlias(state, itemIdA, itemIdB, author, meta?)
 
 // direct aliases
@@ -654,6 +678,12 @@ getAliases(state, itemId) -> MemoryItem[]
 // transitive closure (full identity group)
 getAliasGroup(state, itemId) -> MemoryItem[]
 ```
+
+### Self-referencing edges
+
+`createEdge({ from: x, to: x })` is permitted. Self-edges carry meaning (e.g.
+a self-CONTRADICTS marks an internally inconsistent item) and are tolerated
+by traversal code. Higher layers decide how to interpret them.
 
 ---
 
@@ -675,13 +705,53 @@ Creates a `state.edge` envelope.
 
 ## Replay
 
+Bulk replay is **integrity-tolerant**. Individual bad items (unparsable
+timestamps, duplicate ids, missing parents) are collected in a `skipped` list
+rather than aborting the batch — a long-running daemon keeps running.
+
+```ts
+interface ReplayFailure {
+  index: number;                            // position in the input array
+  command?: MemoryCommand;                  // populated for replayCommands
+  envelope?: EventEnvelope<MemoryCommand>;  // populated for replayFromEnvelopes
+  error: Error;                             // typed; e.g. InvalidTimestampError, DuplicateMemoryError
+}
+```
+
 ### replayCommands(commands)
 
-Folds an array of `MemoryCommand` from an empty state. Returns final state and all lifecycle events.
+Folds an array of `MemoryCommand` from an empty state. Returns:
+
+```ts
+{ state, events, skipped: ReplayFailure[] }
+```
+
+Commands that throw (`DuplicateMemoryError`, `MemoryNotFoundError`, etc.) are
+added to `skipped` and the rest of the batch continues.
 
 ### replayFromEnvelopes(envelopes)
 
-Sorts `EventEnvelope<MemoryCommand>[]` by timestamp, extracts payloads, replays.
+Sorts `EventEnvelope<MemoryCommand>[]` chronologically, extracts payloads, replays.
+
+- Envelope `ts` must be strict ISO 8601: `YYYY-MM-DDTHH:mm:ss[.SSS](Z|±HH:MM)`.
+  Sub-millisecond precision, impossible calendar dates (e.g. `2024-02-31`),
+  and non-ISO formats are rejected as `InvalidTimestampError` and collected
+  in `skipped` — NOT thrown.
+- Years `0000–0099` are parsed correctly (the implementation bypasses
+  `Date.UTC`'s legacy two-digit-year coercion).
+- Apply-time failures (duplicate id, missing parent) are also collected in
+  `skipped`.
+
+Returns `{ state, events, skipped: ReplayFailure[] }`.
+
+```ts
+const { state, skipped } = replayFromEnvelopes(envelopes);
+if (skipped.length > 0) {
+  for (const failure of skipped) {
+    logger.warn({ err: failure.error, ts: failure.envelope?.ts });
+  }
+}
+```
 
 ---
 
