@@ -324,8 +324,10 @@ export function smartRetrieve(
 
   for (const entry of scored) {
     const cost = options.costFn(entry.item);
-    if (!(cost > 0)) {
-      throw new RangeError(`costFn must return a positive number, got ${cost}`);
+    if (cost < 0 || !Number.isFinite(cost)) {
+      throw new RangeError(
+        `costFn must return a finite non-negative number, got ${cost}`,
+      );
     }
     if (cost <= remaining) {
       results.push(entry);

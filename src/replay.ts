@@ -26,7 +26,14 @@ export function replayCommands(commands: MemoryCommand[]): {
 export function replayFromEnvelopes(
   envelopes: EventEnvelope<MemoryCommand>[],
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
-  const sorted = [...envelopes].sort((a, b) => a.ts.localeCompare(b.ts));
+  const sorted = [...envelopes].sort((a, b) => {
+    const ta = Date.parse(a.ts);
+    const tb = Date.parse(b.ts);
+    if (Number.isNaN(ta) || Number.isNaN(tb)) {
+      throw new Error(`Invalid envelope timestamp: "${a.ts}" or "${b.ts}"`);
+    }
+    return ta - tb;
+  });
   const commands = sorted.map((env) => env.payload);
   return replayCommands(commands);
 }

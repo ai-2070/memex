@@ -84,10 +84,22 @@ describe("surfaceContradictions dedupes contradicted_by by item id", () => {
   it("does not annotate self-contradicting items", () => {
     const m1 = makeItem("m1");
     let state = stateWith([m1]);
-    // A self-edge can sneak in via applyCommand (the createEdge helper rejects
-    // it but the reducer path doesn't). Ensure it doesn't land in the item's
-    // own contradicted_by list.
-    state = markContradiction(state, "m1", "m1", "system:detector").state;
+    // `markContradiction` rejects self-references, but a self-edge could
+    // still be introduced by direct `edge.create` commands. Ensure the
+    // dedup path does not annotate an item with itself.
+    state = applyCommand(state, {
+      type: "edge.create",
+      edge: {
+        edge_id: "e-self",
+        from: "m1",
+        to: "m1",
+        kind: "CONTRADICTS",
+        author: "system:detector",
+        source_kind: "derived_deterministic",
+        authority: 1,
+        active: true,
+      },
+    }).state;
 
     const scored = toScored([m1], [0.5]);
     const result = surfaceContradictions(state, scored);

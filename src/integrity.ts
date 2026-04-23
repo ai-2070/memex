@@ -48,6 +48,11 @@ export function markContradiction(
   author: string,
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
+  if (itemIdA === itemIdB) {
+    throw new Error(
+      `Self-contradiction not allowed: both ids are "${itemIdA}"`,
+    );
+  }
   return applyCommand(state, {
     type: "edge.create",
     edge: {
@@ -205,26 +210,45 @@ export function cascadeRetract(
   author: string,
   reason?: string,
 ): { state: GraphState; events: MemoryLifecycleEvent[]; retracted: string[] } {
-  const dependents = getDependents(state, itemId, true);
+  // DFS post-order traversal gives a valid topological sort (leaves before
+  // roots) even when descendants form a DAG with shared children.
+  const visited = new Set<string>();
+  const onStack = new Set<string>();
+  const order: string[] = [];
+
+  const visit = (id: string): void => {
+    if (visited.has(id)) return;
+    if (onStack.has(id)) return; // cycle: break without revisiting
+    onStack.add(id);
+    for (const child of getChildren(state, id)) {
+      visit(child.id);
+    }
+    onStack.delete(id);
+    visited.add(id);
+    order.push(id);
+  };
+
+  for (const child of getChildren(state, itemId)) {
+    visit(child.id);
+  }
+
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];
   const retracted: string[] = [];
 
-  // retract dependents first (leaves before roots)
-  for (const dep of dependents.reverse()) {
-    if (!current.items.has(dep.id)) continue;
+  for (const depId of order) {
+    if (!current.items.has(depId)) continue;
     const r = applyCommand(current, {
       type: "memory.retract",
-      item_id: dep.id,
+      item_id: depId,
       author,
       reason: reason ?? `parent ${itemId} retracted`,
     });
     current = r.state;
     allEvents.push(...r.events);
-    retracted.push(dep.id);
+    retracted.push(depId);
   }
 
-  // retract the item itself
   if (current.items.has(itemId)) {
     const r = applyCommand(current, {
       type: "memory.retract",
@@ -255,6 +279,9 @@ export function markAlias(
   author: string,
   meta?: Record<string, unknown>,
 ): { state: GraphState; events: MemoryLifecycleEvent[] } {
+  if (itemIdA === itemIdB) {
+    throw new Error(`Self-alias not allowed: both ids are "${itemIdA}"`);
+  }
   let current = state;
   const allEvents: MemoryLifecycleEvent[] = [];
 
@@ -367,8 +394,10 @@ export function getItemsByBudget(
 
   for (const entry of scored) {
     const cost = options.costFn(entry.item);
-    if (!(cost > 0)) {
-      throw new RangeError(`costFn must return a positive number, got ${cost}`);
+    if (cost < 0 || !Number.isFinite(cost)) {
+      throw new RangeError(
+        `costFn must return a finite non-negative number, got ${cost}`,
+      );
     }
     if (cost <= remaining) {
       results.push(entry);

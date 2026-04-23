@@ -1,3 +1,4 @@
+import { UUID } from "uuidv7";
 import type {
   GraphState,
   MemoryItem,
@@ -155,11 +156,22 @@ function matchesFilter(item: MemoryItem, filter: MemoryFilter): boolean {
  * Returns null for non-UUIDv7 ids.
  */
 function safeExtractTimestamp(id: string): number | null {
-  const stripped = id.replace(/-/g, "");
-  if (stripped.length < 16 || stripped[12] !== "7") return null;
-  const ts = parseInt(stripped.slice(0, 12), 16);
-  if (isNaN(ts) || ts <= 0) return null;
-  return ts;
+  let parsed: UUID;
+  try {
+    parsed = UUID.parse(id);
+  } catch {
+    return null;
+  }
+  if (parsed.getVersion() !== 7) return null;
+  const b = parsed.bytes;
+  const ts =
+    b[0] * 2 ** 40 +
+    b[1] * 2 ** 32 +
+    b[2] * 2 ** 24 +
+    b[3] * 2 ** 16 +
+    b[4] * 2 ** 8 +
+    b[5];
+  return ts > 0 ? ts : null;
 }
 
 /**
