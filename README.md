@@ -263,6 +263,23 @@ Commands go in, lifecycle events come out of the reducer, state events are full 
 
 `applyCommand` never mutates input state. It returns a new `GraphState` and an array of lifecycle events. History is in the append-only event log; `GraphState` is always the latest snapshot.
 
+### Error Handling & Tolerance
+
+MemEX is a memory graph for noisy agent outputs and background reasoning, not a strict transactional ledger. Errors are layered:
+
+| Layer | Behavior |
+|-------|----------|
+| **Graph mutations** (`markAlias`, `markContradiction`, `resolveContradiction`, `createEdge`) | Never throw on degenerate shapes. Self-alias is a silent no-op; self-contradiction is recorded as a meaningful "internally inconsistent" marker; resolving a nonexistent contradiction is a no-op. The fold survives noisy input. |
+| **API boundary** (`extractTimestamp`, envelope `ts` parsing) | Throw typed, catchable errors (`InvalidTimestampError`). The caller is expected to fix their input. |
+| **Bulk replay** (`replayCommands`, `replayFromEnvelopes`) | Integrity-tolerant. Per-item failures (unparsable timestamps, duplicate ids, missing parents) are collected in a `skipped: ReplayFailure[]` list rather than aborting the batch. A long-running daemon keeps running. |
+
+```ts
+const { state, events, skipped } = replayFromEnvelopes(envelopes);
+for (const failure of skipped) {
+  logger.warn({ err: failure.error, at: failure.envelope?.ts });
+}
+```
+
 ## Design Philosophy
 
 Every system encodes assumptions about truth, knowledge, and time — whether it acknowledges them or not. MemEX makes those assumptions explicit.
@@ -411,7 +428,9 @@ Memory is no longer a local resource. It is portable belief.
 - Serialization (`toJSON` / `fromJSON` / `stringify` / `parse`)
 - Graph stats (counts by kind, author, scope, edge kind)
 - Event envelope wrapping for bus integration
-- Command log replay for state reconstruction
+- Integrity-tolerant replay: per-item failures collected as `skipped: ReplayFailure[]`, batch continues
+- Cascade retraction uses DFS post-order (valid topological sort for DAGs, cycle-safe)
+- Typed errors at API boundaries (`InvalidTimestampError`, `DuplicateMemoryError`, ...)
 
 **Intent graph:**
 - Status machine: active ↔ paused → completed / cancelled
