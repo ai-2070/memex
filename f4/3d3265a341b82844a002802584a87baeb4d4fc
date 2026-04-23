@@ -1,0 +1,23 @@
+tests/bugfix-sweep.test.ts
+  6720d633b6d40dae 783-811
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "f43d3265a341b82844a002802584a87baeb4d4fc",
+  "prompts": {
+    "6720d633b6d40dae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c4b44370-5718-4cb3-8f9d-e3768c740297",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 28,
+      "total_deletions": 24,
+      "accepted_lines": 138,
+      "overriden_lines": 0
+    }
+  }
+}
