@@ -1,6 +1,6 @@
 {
   "name": "@ai2070/memex",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "MemEX memory layer — Multi-session continuity for AI systems",
   "type": "module",
   "main": "./dist/index.js",
