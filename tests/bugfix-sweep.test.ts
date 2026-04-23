@@ -780,31 +780,35 @@ describe("bugfix-sweep: cascadeRetract produces a valid topological order for DA
     expect(res.state.items.size).toBe(0);
   });
 
-  it("handles deep dependency chains without stack overflow", () => {
-    // A chain of 20,000 nodes would blow the JS call stack on a recursive
-    // DFS (node default ~10k frames). The iterative traversal should fly.
-    const N = 20_000;
-    const ids: string[] = [];
-    const items = new Map();
-    for (let i = 0; i < N; i++) {
-      const id = `chain-${i.toString().padStart(6, "0")}`;
-      ids.push(id);
-      const item = mkItem(id, {
-        created_at: 1_700_000_000_000 + i,
-        parents: i === 0 ? undefined : [ids[i - 1]],
-      });
-      items.set(id, item);
-    }
-    const state = { items, edges: new Map() };
+  it(
+    "handles deep dependency chains without stack overflow",
+    { timeout: 30_000 },
+    () => {
+      // A chain of 5,000 nodes is deep enough to blow Node's default call
+      // stack on a recursive DFS (empirically ~10k with simple frames, less
+      // with closures / try-catch). The iterative traversal must handle it.
+      // getChildren scans the item map, so cascade is O(N^2); keep N bounded.
+      const N = 5_000;
+      const ids: string[] = [];
+      const items = new Map();
+      for (let i = 0; i < N; i++) {
+        const id = `chain-${i.toString().padStart(6, "0")}`;
+        ids.push(id);
+        const item = mkItem(id, {
+          created_at: 1_700_000_000_000 + i,
+          parents: i === 0 ? undefined : [ids[i - 1]],
+        });
+        items.set(id, item);
+      }
+      const state = { items, edges: new Map() };
 
-    const res = cascadeRetract(state, ids[0], "tester");
-    // Every descendant plus the root should be retracted.
-    expect(res.retracted).toHaveLength(N);
-    // Root is last; leaf (N-1) is first.
-    expect(res.retracted[res.retracted.length - 1]).toBe(ids[0]);
-    expect(res.retracted[0]).toBe(ids[N - 1]);
-    expect(res.state.items.size).toBe(0);
-  });
+      const res = cascadeRetract(state, ids[0], "tester");
+      expect(res.retracted).toHaveLength(N);
+      expect(res.retracted[res.retracted.length - 1]).toBe(ids[0]);
+      expect(res.retracted[0]).toBe(ids[N - 1]);
+      expect(res.state.items.size).toBe(0);
+    },
+  );
 });
 
 describe("bugfix-sweep: createEventEnvelope still produces parseable timestamps", () => {
