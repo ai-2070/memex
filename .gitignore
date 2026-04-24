@@ -19,7 +19,6 @@ dist-test/
 *.swo
 *~
 .DS_Store
-.claude/
 PLAN*.md
 
 # Testing
