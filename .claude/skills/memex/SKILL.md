@@ -37,7 +37,7 @@ MemEX is layered on purpose. Do NOT wrap graph-mutation calls in try/catch "just
 
 | Layer | Throws? | Where |
 |-------|---------|-------|
-| Graph mutations — `markAlias`, `markContradiction`, `resolveContradiction`, `createEdge` | No. Record/flag/no-op on degenerate shapes. | Library internals |
+| Graph mutations — `markAlias`, `markContradiction`, `resolveContradiction`, `createEdge` | **Structural anomalies**: no. Self-reference, stale resolve, redundant alias are recorded/flagged/no-op'd. **Basic input validation** (factories `createEdge` / `createMemoryItem`): throws `RangeError` on scores outside `[0, 1]`. | Library internals |
 | Reducer — `applyCommand` | Throws typed errors (`DuplicateMemoryError`, `MemoryNotFoundError`, ...) | Single-command API |
 | API boundary — `extractTimestamp`, envelope `ts` parsing | Throws typed `InvalidTimestampError` — caller fixes input | Inputs from outside |
 | Bulk replay — `replayCommands`, `replayFromEnvelopes` | Never throws. Per-item failures go to `result.skipped: ReplayFailure[]`. | Long-running daemons |
