@@ -216,6 +216,152 @@ state = applyCommand(state, cmd).state;
 
 5. **Check `API.md` for exact signatures** before writing code — it's the source of truth. Use `Grep` to find examples already in the repo if helpful.
 
+## Command shape quick reference
+
+Copy these exactly — most agent errors are confusing `item` vs `item_id` or forgetting `author`.
+
+**Memory:**
+```ts
+{ type: "memory.create",  item: MemoryItem }
+{ type: "memory.update",  item_id, partial, author, reason?, basis? }
+{ type: "memory.retract", item_id, author, reason? }
+```
+
+**Edge:**
+```ts
+{ type: "edge.create",  edge: Edge }
+{ type: "edge.update",  edge_id, partial, author, reason? }
+{ type: "edge.retract", edge_id, author, reason? }
+```
+
+**Intent** (separate reducer: `applyIntentCommand`):
+```ts
+{ type: "intent.create",   intent: Intent }
+{ type: "intent.update",   intent_id, partial, author, reason? }
+{ type: "intent.complete", intent_id, author, reason? }
+{ type: "intent.cancel",   intent_id, author, reason? }
+{ type: "intent.pause",    intent_id, author, reason? }
+{ type: "intent.resume",   intent_id, author, reason? }
+```
+
+**Task** (separate reducer: `applyTaskCommand`):
+```ts
+{ type: "task.create",   task: Task }
+{ type: "task.update",   task_id, partial, author }
+{ type: "task.start",    task_id, agent_id? }
+{ type: "task.complete", task_id, result?, output_memory_ids? }
+{ type: "task.fail",     task_id, error, retryable? }
+{ type: "task.cancel",   task_id, reason? }
+```
+
+## Status machines (typed errors on invalid transitions)
+
+**Intent** — throws `InvalidIntentTransitionError`:
+```
+     create
+       ↓
+  ┌─ active ⇄ paused
+  │    │       │
+  │    └──┬────┘
+  │       ↓
+  │  completed  (terminal)
+  └──→ cancelled (terminal)
+```
+`complete` / `cancel` are valid from `active` or `paused`. Terminal states reject all further transitions.
+
+**Task** — throws `InvalidTaskTransitionError`:
+```
+  pending ── start ──→ running ── complete ──→ completed
+                         │  ↑                  (terminal)
+                         │  │
+                         └ fail ──→ failed ── start ──→ running   (retry)
+                         │
+                         └ cancel ──→ cancelled                   (terminal from any non-terminal)
+```
+`start` is valid from `pending` or `failed` (retry). `complete`/`fail` only from `running`. `cancel` is valid from `pending` or `running`.
+
+## MemoryFilter cheatsheet
+
+All fields are optional; combine freely. A filter matches when *all* provided fields match (AND).
+
+```ts
+{
+  // identity / scope
+  ids:          ["m1", "m2"],                    // match any of these ids
+  scope:        "user:laz/general",              // exact
+  scope_prefix: "project:",                      // startsWith
+  author:       "agent:researcher",
+  kind:         "observation",                   // observation | assertion | hypothesis | ...
+  source_kind:  "observed",
+
+  // score ranges
+  range: {
+    authority:  { min: 0.5, max: 1 },
+    conviction: { min: 0.2 },
+    importance: { max: 0.8 },
+  },
+
+  // provenance
+  has_parent: "m42",                             // sugar for parents.includes
+  is_root:    true,                              // sugar for parents.count.max = 0
+  parents: {
+    includes:     "m42",                         // must include this id
+    includes_any: ["m42", "m43"],                // at least one of
+    includes_all: ["m42", "m43"],                // all of
+    count: { min: 1, max: 3 },
+  },
+
+  // cross-graph links
+  intent_id:  "i1",
+  intent_ids: ["i1", "i2"],
+  task_id:    "t1",
+
+  // meta (dot-path exact match)
+  meta:     { "tags.env": "prod" },              // item.meta.tags.env === "prod"
+  meta_has: ["agent_id", "session_id"],          // these dot-paths must exist
+
+  // time
+  created: { after: Date.now() - 86_400_000, before: Date.now() },
+
+  // query-time decay filter (drop faded items)
+  decay: {
+    config: { rate: 0.1, interval: "day", type: "exponential" },
+    min:    0.5,                                 // keep if multiplier >= 0.5
+  },
+
+  // boolean algebra
+  not: { kind: "hypothesis" },                   // negation — any MemoryFilter shape
+  or:  [{ kind: "observation" }, { kind: "assertion" }],
+}
+```
+
+**DecayConfig** valid intervals: `"hour" | "day" | "week"` (no "minute" or "month"). Types: `"exponential" | "linear" | "step"`.
+
+**SortField**: `"authority" | "conviction" | "importance" | "recency"`. Use `QueryOptions.sort` as a single `SortOption` or an array (first = primary, rest = tiebreakers).
+
+## Use the tests as exemplars
+
+540+ working usages are already in `tests/`. Grep there before improvising:
+
+```bash
+# find examples of a specific API
+rg "smartRetrieve\(" tests/
+rg "cascadeRetract\(" tests/
+rg "importSlice\(" tests/
+
+# find examples of a specific pattern
+rg "kind: \"hypothesis\"" tests/
+rg "parents:" tests/ -A 2
+```
+
+Particularly useful files:
+- `tests/reducer.test.ts` — canonical command shapes
+- `tests/query.test.ts` / `tests/query-advanced.test.ts` — filter patterns
+- `tests/retrieval.test.ts` — scored + budget + decay
+- `tests/transplant.test.ts` — export/import slices
+- `tests/replay.test.ts` — bulk replay with `skipped`
+- `tests/intent.test.ts` / `tests/task.test.ts` — status machines
+
 ## Keep it terse
 
 When writing code for the user, show the *minimum idiomatic* example — don't re-document the library inline. Link to `API.md` or `README.md` for detail. MemEX is opinionated; match the opinions.
