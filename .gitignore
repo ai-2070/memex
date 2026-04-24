@@ -20,6 +20,7 @@ dist-test/
 *~
 .DS_Store
 PLAN*.md
+.claude/settings.local.json
 
 # Testing
 coverage/
