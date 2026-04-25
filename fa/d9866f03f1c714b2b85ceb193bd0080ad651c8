@@ -1,0 +1,23 @@
+.claude/skills/memex/SKILL.md
+  763bae35b8d5546c 30,43,87-105,130-131,145-146,148-150,182,192-266,271-272,313-314,316,318,322
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fad9866f03f1c714b2b85ceb193bd0080ad651c8",
+  "prompts": {
+    "763bae35b8d5546c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1f65b9c-b887-42f4-bcb9-651814cc68c2",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "LZL0",
+      "messages": [],
+      "total_additions": 112,
+      "total_deletions": 7,
+      "accepted_lines": 111,
+      "overriden_lines": 1
+    }
+  }
+}
