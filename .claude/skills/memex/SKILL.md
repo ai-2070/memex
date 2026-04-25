@@ -27,7 +27,7 @@ Always write code that matches MemEX's tolerance model: noisy input should not c
 - `conviction` — how sure the author was
 - `importance` — how much attention it needs right now (salient, not permanent)
 
-**Item kinds**: `observation | assertion | assumption | hypothesis | derivation | simulation | policy | trait`. The `kind` says what it *is*; `source_kind` (`user_explicit | observed | agent_inferred | imported | ...`) says how it *got here*.
+**Item kinds**: `observation | assertion | assumption | hypothesis | derivation | simulation | policy | trait`. The `kind` says what it *is*; `source_kind` says how it *got here*. Closed list: `user_explicit | observed | derived_deterministic | agent_inferred | simulated | imported`. The type is widened to `string` so custom values are accepted, but stick to the enum unless you have a reason.
 
 **Edges**: typed relationships — `DERIVED_FROM`, `CONTRADICTS`, `SUPPORTS`, `ABOUT`, `SUPERSEDES`, `ALIAS`. Edges are created via `edge.create` commands or via helpers like `markContradiction`, `markAlias`, `resolveContradiction`.
 
@@ -40,7 +40,7 @@ MemEX is layered on purpose. Do NOT wrap graph-mutation calls in try/catch "just
 | Graph mutations — `markAlias`, `markContradiction`, `resolveContradiction`, `createEdge` | **Structural anomalies**: no. Self-reference, stale resolve, redundant alias are recorded/flagged/no-op'd. **Basic input validation** (factories `createEdge` / `createMemoryItem`): throws `RangeError` on scores outside `[0, 1]`. | Library internals |
 | Reducer — `applyCommand` | Throws typed errors (`DuplicateMemoryError`, `MemoryNotFoundError`, ...) | Single-command API |
 | API boundary — `extractTimestamp`, envelope `ts` parsing | Throws typed `InvalidTimestampError` — caller fixes input | Inputs from outside |
-| Bulk replay — `replayCommands`, `replayFromEnvelopes` | Never throws. Per-item failures go to `result.skipped: ReplayFailure[]`. | Long-running daemons |
+| Bulk replay — `replayCommands`, `replayFromEnvelopes` | Never throws. Per-item failures (including envelope `ts` parse errors in `replayFromEnvelopes`) go to `result.skipped: ReplayFailure[]`. | Long-running daemons |
 
 Write daemons accordingly:
 
@@ -84,6 +84,25 @@ state = applyCommand(state, { type: "memory.create", item: obs }).state;
 
 For derivations, set `parents` to the ids of the items they were inferred from. That builds the provenance tree automatically.
 
+For edges, prefer `createEdge` (auto-assigns `edge_id` and defaults `active: true`). Edges carry an `active: boolean` — that's how `markContradiction` / `resolveContradiction` deactivate edges without removing them, so traversals must respect the flag.
+
+```ts
+import { createEdge, applyCommand } from "@ai2070/memex";
+
+const edge = createEdge({
+  from: parentId,
+  to: childId,
+  kind: "DERIVED_FROM",
+  author: "agent:reasoner",
+  source_kind: "agent_inferred",
+  authority: 0.8,
+});
+
+state = applyCommand(state, { type: "edge.create", edge }).state;
+```
+
+For Intent and Task graphs, the matching factories are `createIntent` (defaults `status: "active"`) and `createTask` (defaults `status: "pending"`, `attempt: 0`).
+
 ### Retrieval (choose the right function)
 
 | Need | Use |
@@ -108,6 +127,8 @@ getItems(state, { meta: { agent_id: "agent:researcher" } });
 getScoredItems(state, weights, { pre: { scope_prefix: "project:x/" } });
 ```
 
+`meta` keys use dot-paths and exact-match — `meta: { "tags.env": "prod" }` matches `item.meta.tags.env === "prod"`. See the **MemoryFilter cheatsheet** below for the full grammar.
+
 ### Hard isolation via transplant
 
 For sandboxed sub-agents or parallel reasoning:
@@ -121,7 +142,12 @@ const slice = exportSlice(memState, intentState, taskState, {
 
 // ... sub-agent operates on the slice ...
 
-const { memState: merged, report } = importSlice(
+const {
+  memState: mergedMem,
+  intentState: mergedIntent,
+  taskState: mergedTask,
+  report,
+} = importSlice(
   memState, intentState, taskState, subSlice,
   { shallowCompareExisting: true, reIdOnDifference: true },
 );
@@ -153,7 +179,7 @@ A common loop: items with high importance AND low authority need reasoning. Afte
 ```ts
 const priority = item.importance * (1 - item.authority); // higher = more worth thinking about
 
-// after processing
+// after processing a single item
 applyCommand(state, {
   type: "memory.update",
   item_id: item.id,
@@ -163,9 +189,86 @@ applyCommand(state, {
 });
 ```
 
+For bulk/scheduled decay across many items, use `decayImportance(state, olderThanMs, factor, author, reason?)` instead of looping `memory.update` — see "Bulk operations" below.
+
+### Bulk operations
+
+For multi-item updates in a single pass (single Map clone, single event batch), prefer the helpers in `bulk.ts` over hand-rolled loops:
+
+```ts
+import { applyMany, bulkAdjustScores, decayImportance } from "@ai2070/memex";
+
+// arbitrary transform — return null to retract, {} to skip, partial to update
+const { state: s2, events } = applyMany(
+  state,
+  { kind: "hypothesis", range: { authority: { max: 0.3 } } },
+  (item) => (Date.now() - (item.created_at ?? 0) > 7 * 86_400_000 ? null : {}),
+  "system:gc",
+  "stale low-authority hypothesis cleanup",
+);
+
+// score-only adjustments (clamped to [0,1])
+const { state: s3 } = bulkAdjustScores(
+  s2,
+  { meta: { agent_id: "agent:noisy" } },
+  { authority: -0.1 },
+  "system:calibration",
+);
+
+// time-based importance decay (skips items already at 0)
+const { state: s4 } = decayImportance(s3, 24 * 86_400_000, 0.5, "system:nightly");
+```
+
+`applyMany` returning `null` retracts the item *and* cleans up incident edges (lazy reverse-index), matching the reducer's `memory.retract` behavior.
+
+### Provenance & inspection helpers
+
+Read-only navigators for the graphs you've built:
+
+```ts
+import {
+  getParents, getChildren, getRelatedItems,    // direct neighborhood
+  getSupportTree, getSupportSet,               // recursive provenance
+  getDependents,                               // who depends on this?
+  getStaleItems,                               // items with retracted parents
+  getContradictions, getAliases, getAliasGroup,
+  getStats,
+} from "@ai2070/memex";
+
+getParents(state, itemId);                     // MemoryItem[]
+getDependents(state, itemId, /*transitive=*/ true);
+getSupportTree(state, itemId);                 // walks DERIVED_FROM upward
+getStats(state);                               // counts by kind / source_kind / etc.
+```
+
+Use these instead of hand-walking `state.items` / `state.edges` — they handle cycles, missing parents, and inactive edges correctly.
+
+### Envelope helpers
+
+To produce envelopes that `replayFromEnvelopes` can later fold:
+
+```ts
+import {
+  createEventEnvelope,                         // arbitrary payload
+  wrapLifecycleEvent,                          // wrap an event from applyCommand
+  wrapStateEvent, wrapEdgeStateEvent,          // current-state snapshots
+} from "@ai2070/memex";
+
+const { events } = applyCommand(state, cmd);
+for (const ev of events) {
+  await log.append(wrapLifecycleEvent(ev, /*causeId=*/ cmdId, traceId));
+}
+```
+
+### Cloning state
+
+`cloneGraphState(state)` returns a shallow-cloned `GraphState` (new Maps, same item/edge object references). Use it before passing state into code you don't trust to treat it as immutable; do not use it as a substitute for `applyCommand` — items themselves are not deep-copied.
+
 ## Scripting quick-starts
 
 ### Fold an event log into state
+
+`replayFromEnvelopes` accepts memory-namespace envelopes only (`EventEnvelope<MemoryCommand>`). Intent and Task graphs do not have a fold-replay helper — drive their reducers directly with `applyIntentCommand` / `applyTaskCommand` if you need to rebuild them.
 
 ```ts
 import { replayFromEnvelopes } from "@ai2070/memex";
@@ -207,14 +310,16 @@ state = applyCommand(state, cmd).state;
 3. **If the user has a bug**: check for these before anything else:
    - Mutating `state.items` / `state.edges` directly (should be `applyCommand`)
    - Missing `state = ...` reassignment after `applyCommand`
-   - Expecting `replayFromEnvelopes` to throw (it collects in `skipped`)
+   - Expecting `replayFromEnvelopes` to throw — it collects in `skipped`, including envelope `ts` parse errors (those land in `skipped[].error`, not the call site)
+   - Feeding non-memory envelopes into `replayFromEnvelopes` (intent/task envelopes aren't supported — drive their reducers directly)
    - Expecting `markAlias(a,a)` / `resolveContradiction` with no edge to throw (they no-op)
-   - Trying to update `created_at` via partial (it's stripped)
+   - Trying to update `created_at` via partial (it's stripped, same as `id`)
    - Passing a non-UUIDv7 id to `extractTimestamp` (throws `InvalidTimestampError`)
+   - Walking edges without checking `edge.active` — deactivated edges still live in `state.edges`
 
 4. **If the user is integrating MemEX into an agent**: default to the "Soft isolation (shared graph, scoped views)" pattern — one graph, `meta.agent_id` / `scope` filters. Only suggest transplant for genuinely sandboxed work.
 
-5. **Check `API.md` for exact signatures** before writing code — it's the source of truth. Use `Grep` to find examples already in the repo if helpful.
+5. **Check `API.md` for exact signatures** before writing code — it's the source of truth. For working examples, grep `tests/` (see "Use the tests as exemplars" below for the file map: `reducer`, `query`, `retrieval`, `transplant`, `replay`, `intent`, `task`).
 
 ## Command shape quick reference
 
