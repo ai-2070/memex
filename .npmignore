@@ -1,0 +1,29 @@
+# Misc
+.env*
+
+# Build artifacts
+html/
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dev dependencies config
+renovate.json
+
+# Lock files (users have their own)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Git
+.git/
+
+# Banners
+img/
