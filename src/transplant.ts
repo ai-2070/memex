@@ -8,7 +8,7 @@ import type {
 import type { IntentState, Intent, IntentLifecycleEvent } from "./intent.js";
 import type { TaskState, Task, TaskLifecycleEvent } from "./task.js";
 import { getChildren, getEdges, extractTimestamp } from "./query.js";
-import { applyCommand } from "./reducer.js";
+import { applyCommandInPlace } from "./reducer.js";
 import { applyIntentCommand } from "./intent.js";
 import { applyTaskCommand } from "./task.js";
 
@@ -355,7 +355,13 @@ export function importSlice(
   const allIntentIds = new Set(intentState.intents.keys());
   const allTaskIds = new Set(taskState.tasks.keys());
 
-  let currentMem = memState;
+  // Memory items/edges are imported into one pair of working maps, mutated in
+  // place. Cloning the whole graph per created/updated entity (as the immutable
+  // applyCommand does) would make importing M entities O(M^2). Intents and
+  // tasks stay on the immutable reducers — a slice carries far fewer of them,
+  // so their per-command clone is not a hot path.
+  const items = new Map(memState.items);
+  const edges = new Map(memState.edges);
   let currentIntent = intentState;
   let currentTask = taskState;
 
@@ -377,7 +383,7 @@ export function importSlice(
 
   // --- import memories ---
   for (const item of slice.memories) {
-    const existing = currentMem.items.get(item.id);
+    const existing = items.get(item.id);
     if (existing) {
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, item as any)) {
@@ -388,11 +394,10 @@ export function importSlice(
               id: newId,
               parents: rewriteIds(item.parents, memIdMap),
             };
-            const result = applyCommand(currentMem, {
+            applyCommandInPlace(items, edges, {
               type: "memory.create",
               item: remapped,
             });
-            currentMem = result.state;
             report.created.memories.push(newId);
           } else {
             report.conflicts.memories.push(item.id);
@@ -404,13 +409,12 @@ export function importSlice(
       }
       // skipExisting is false — update existing item
       const { id: _id, ...rest } = item;
-      const result = applyCommand(currentMem, {
+      applyCommandInPlace(items, edges, {
         type: "memory.update",
         item_id: item.id,
         partial: { ...rest, parents: rewriteIds(item.parents, memIdMap) },
         author: item.author,
       });
-      currentMem = result.state;
       report.updated.memories.push(item.id);
       continue;
     }
@@ -419,20 +423,19 @@ export function importSlice(
       ...item,
       parents: rewriteIds(item.parents, memIdMap),
     };
-    const result = applyCommand(currentMem, {
+    applyCommandInPlace(items, edges, {
       type: "memory.create",
       item: remapped,
     });
-    currentMem = result.state;
     report.created.memories.push(item.id);
   }
 
   // track all known edge ids for collision-free re-id generation
-  const allEdgeIds = new Set(currentMem.edges.keys());
+  const allEdgeIds = new Set(edges.keys());
 
   // --- import edges ---
   for (const edge of slice.edges) {
-    const existing = currentMem.edges.get(edge.edge_id);
+    const existing = edges.get(edge.edge_id);
     if (existing) {
       if (skipExisting) {
         if (shallowCompare && !shallowEqual(existing as any, edge as any)) {
@@ -445,11 +448,10 @@ export function importSlice(
               from: rewriteId(edge.from, memIdMap),
               to: rewriteId(edge.to, memIdMap),
             };
-            const result = applyCommand(currentMem, {
+            applyCommandInPlace(items, edges, {
               type: "edge.create",
               edge: remapped,
             });
-            currentMem = result.state;
             report.created.edges.push(newId);
           } else {
             report.conflicts.edges.push(edge.edge_id);
@@ -461,13 +463,12 @@ export function importSlice(
       }
       // skipExisting is false — update existing edge
       const { edge_id: _eid, from: _from, to: _to, ...edgeRest } = edge;
-      const result = applyCommand(currentMem, {
+      applyCommandInPlace(items, edges, {
         type: "edge.update",
         edge_id: edge.edge_id,
         partial: edgeRest,
         author: edge.author,
       });
-      currentMem = result.state;
       report.updated.edges.push(edge.edge_id);
       continue;
     }
@@ -477,11 +478,10 @@ export function importSlice(
       from: rewriteId(edge.from, memIdMap),
       to: rewriteId(edge.to, memIdMap),
     };
-    const result = applyCommand(currentMem, {
+    applyCommandInPlace(items, edges, {
       type: "edge.create",
       edge: remapped,
     });
-    currentMem = result.state;
     report.created.edges.push(edge.edge_id);
   }
 
@@ -652,7 +652,7 @@ export function importSlice(
       ...report.updated.memories,
     ];
     for (const memId of importedMemIds) {
-      const item = currentMem.items.get(memId);
+      const item = items.get(memId);
       if (!item) continue;
       const newIntentId = item.intent_id
         ? intentIdMap.get(item.intent_id)
@@ -662,19 +662,18 @@ export function importSlice(
         const partial: Partial<MemoryItem> = {};
         if (newIntentId) partial.intent_id = newIntentId;
         if (newTaskId) partial.task_id = newTaskId;
-        const result = applyCommand(currentMem, {
+        applyCommandInPlace(items, edges, {
           type: "memory.update",
           item_id: memId,
           partial,
           author: "system:import",
         });
-        currentMem = result.state;
       }
     }
   }
 
   return {
-    memState: currentMem,
+    memState: { items, edges },
     intentState: currentIntent,
     taskState: currentTask,
     report,

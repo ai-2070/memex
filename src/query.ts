@@ -423,3 +423,33 @@ export function getChildren(state: GraphState, itemId: string): MemoryItem[] {
   }
   return results;
 }
+
+/**
+ * Build a parent-id -> children index in a single pass over the graph.
+ *
+ * `getChildren` is O(items) per call; callers that need every node's children
+ * (transitive dependents, cascade retraction) would otherwise re-scan the whole
+ * graph once per node, making the walk O(nodes x items). Building the index once
+ * up front turns those walks into O(items + edges-of-the-walk).
+ */
+export function buildChildrenIndex(
+  state: GraphState,
+): Map<string, MemoryItem[]> {
+  const index = new Map<string, MemoryItem[]>();
+  for (const item of state.items.values()) {
+    if (!item.parents) continue;
+    // Dedup an item's own parent list so a child listed twice under the same
+    // parent appears once, matching getChildren's `includes` semantics.
+    const seen = item.parents.length > 1 ? new Set<string>() : null;
+    for (const pid of item.parents) {
+      if (seen) {
+        if (seen.has(pid)) continue;
+        seen.add(pid);
+      }
+      let list = index.get(pid);
+      if (!list) index.set(pid, (list = []));
+      list.push(item);
+    }
+  }
+  return index;
+}

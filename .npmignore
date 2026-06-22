@@ -17,6 +17,9 @@ Thumbs.db
 # Dev dependencies config
 renovate.json
 
+# Benchmarks (dev-only)
+bench/
+
 # Lock files (users have their own)
 package-lock.json
 pnpm-lock.yaml

@@ -19,8 +19,9 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prettier": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
-    "prettier:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\""
+    "bench": "vitest bench --run",
+    "prettier": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\" \"bench/**/*.ts\"",
+    "prettier:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\" \"bench/**/*.ts\""
   },
   "license": "Apache-2.0",
   "dependencies": {

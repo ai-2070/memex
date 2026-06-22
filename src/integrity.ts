@@ -6,8 +6,13 @@ import type {
   ScoreWeights,
   ScoredItem,
 } from "./types.js";
-import { applyCommand } from "./reducer.js";
-import { getEdges, getChildren, getScoredItems } from "./query.js";
+import { applyCommand, retractItemsInPlace } from "./reducer.js";
+import {
+  getEdges,
+  getChildren,
+  getScoredItems,
+  buildChildrenIndex,
+} from "./query.js";
 import { uuidv7 } from "uuidv7";
 
 // ---------------------------------------------------------------------------
@@ -181,19 +186,23 @@ export function getDependents(
   itemId: string,
   transitive = false,
 ): MemoryItem[] {
-  const direct = getChildren(state, itemId);
-  if (!transitive) return direct;
+  if (!transitive) return getChildren(state, itemId);
 
+  // Walk the dependency tree off a single children index instead of re-scanning
+  // the whole graph at every node (which made the transitive walk O(nodes x
+  // items)).
+  const childrenIndex = buildChildrenIndex(state);
   const visited = new Set<string>();
   const result: MemoryItem[] = [];
-  const queue = [...direct];
+  const queue = [...(childrenIndex.get(itemId) ?? [])];
 
   while (queue.length > 0) {
     const item = queue.pop()!;
     if (visited.has(item.id)) continue;
     visited.add(item.id);
     result.push(item);
-    queue.push(...getChildren(state, item.id));
+    const children = childrenIndex.get(item.id);
+    if (children) for (const child of children) queue.push(child);
   }
 
   return result;
@@ -215,12 +224,17 @@ export function cascadeRetract(
   // Pre-mark the root as visited so any cycle that points back to it is
   // ignored — the root is retracted separately at the end of this function,
   // never prematurely as part of the descendants list.
+  // Children index built once: getChildren is O(items), and walking it per node
+  // made the traversal O(nodes x items) on top of the per-retract clone below.
+  const childrenIndex = buildChildrenIndex(state);
+  const childrenOf = (id: string): MemoryItem[] => childrenIndex.get(id) ?? [];
+
   const visited = new Set<string>([itemId]);
   const order: string[] = [];
 
   type Frame = { id: string; phase: "enter" | "exit" };
   const stack: Frame[] = [];
-  for (const child of getChildren(state, itemId)) {
+  for (const child of childrenOf(itemId)) {
     stack.push({ id: child.id, phase: "enter" });
   }
 
@@ -234,43 +248,26 @@ export function cascadeRetract(
     visited.add(frame.id);
     // Push exit first so it's processed after all children (post-order).
     stack.push({ id: frame.id, phase: "exit" });
-    for (const child of getChildren(state, frame.id)) {
+    for (const child of childrenOf(frame.id)) {
       if (!visited.has(child.id)) {
         stack.push({ id: child.id, phase: "enter" });
       }
     }
   }
 
-  let current = state;
-  const allEvents: MemoryLifecycleEvent[] = [];
-  const retracted: string[] = [];
+  // Retract descendants (post-order) then the root, in a single clone with one
+  // edge index, instead of cloning the whole graph once per retracted item.
+  const items = new Map(state.items);
+  const edges = new Map(state.edges);
+  if (state.items.has(itemId)) order.push(itemId); // root retracted last
+  const { events, retracted } = retractItemsInPlace(
+    items,
+    edges,
+    order,
+    "memory.retract",
+  );
 
-  for (const depId of order) {
-    if (!current.items.has(depId)) continue;
-    const r = applyCommand(current, {
-      type: "memory.retract",
-      item_id: depId,
-      author,
-      reason: reason ?? `parent ${itemId} retracted`,
-    });
-    current = r.state;
-    allEvents.push(...r.events);
-    retracted.push(depId);
-  }
-
-  if (current.items.has(itemId)) {
-    const r = applyCommand(current, {
-      type: "memory.retract",
-      item_id: itemId,
-      author,
-      reason,
-    });
-    current = r.state;
-    allEvents.push(...r.events);
-    retracted.push(itemId);
-  }
-
-  return { state: current, events: allEvents, retracted };
+  return { state: { items, edges }, events, retracted };
 }
 
 // ---------------------------------------------------------------------------

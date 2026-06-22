@@ -1,11 +1,12 @@
 import type {
   GraphState,
   MemoryCommand,
+  MemoryItem,
+  Edge,
   MemoryLifecycleEvent,
   EventEnvelope,
 } from "./types.js";
-import { createGraphState } from "./graph.js";
-import { applyCommand } from "./reducer.js";
+import { applyCommandInPlace } from "./reducer.js";
 import { InvalidTimestampError } from "./errors.js";
 
 /**
@@ -24,15 +25,19 @@ export function replayCommands(commands: MemoryCommand[]): {
   events: MemoryLifecycleEvent[];
   skipped: ReplayFailure[];
 } {
-  let state = createGraphState();
+  // Fold all commands into one pair of maps, mutating in place. Cloning the
+  // whole state per command (as the immutable applyCommand does) would make
+  // replaying N commands O(N^2); applyCommandInPlace is atomic per command, so
+  // a failed command is skipped without corrupting the accumulated state.
+  const items = new Map<string, MemoryItem>();
+  const edges = new Map<string, Edge>();
   const allEvents: MemoryLifecycleEvent[] = [];
   const skipped: ReplayFailure[] = [];
 
   for (let i = 0; i < commands.length; i++) {
     try {
-      const result = applyCommand(state, commands[i]);
-      state = result.state;
-      allEvents.push(...result.events);
+      const events = applyCommandInPlace(items, edges, commands[i]);
+      for (const event of events) allEvents.push(event);
     } catch (err) {
       skipped.push({
         index: i,
@@ -42,7 +47,7 @@ export function replayCommands(commands: MemoryCommand[]): {
     }
   }
 
-  return { state, events: allEvents, skipped };
+  return { state: { items, edges }, events: allEvents, skipped };
 }
 
 // Strict ISO 8601 with milliseconds-only precision and an explicit offset.
@@ -147,14 +152,15 @@ export function replayFromEnvelopes(
 
   sortable.sort((a, b) => a.ts - b.ts);
 
-  let state = createGraphState();
+  // Same single-pass, in-place fold as replayCommands — O(N) instead of O(N^2).
+  const items = new Map<string, MemoryItem>();
+  const edges = new Map<string, Edge>();
   const allEvents: MemoryLifecycleEvent[] = [];
 
   for (const { env, index } of sortable) {
     try {
-      const result = applyCommand(state, env.payload);
-      state = result.state;
-      allEvents.push(...result.events);
+      const events = applyCommandInPlace(items, edges, env.payload);
+      for (const event of events) allEvents.push(event);
     } catch (err) {
       skipped.push({
         index,
@@ -164,5 +170,5 @@ export function replayFromEnvelopes(
     }
   }
 
-  return { state, events: allEvents, skipped };
+  return { state: { items, edges }, events: allEvents, skipped };
 }

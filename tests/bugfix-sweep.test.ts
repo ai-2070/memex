@@ -787,7 +787,8 @@ describe("bugfix-sweep: cascadeRetract produces a valid topological order for DA
       // A chain of 5,000 nodes is deep enough to blow Node's default call
       // stack on a recursive DFS (empirically ~10k with simple frames, less
       // with closures / try-catch). The iterative traversal must handle it.
-      // getChildren scans the item map, so cascade is O(N^2); keep N bounded.
+      // cascadeRetract walks a prebuilt children index and retracts in a single
+      // pass, so this is O(N); 5,000 stays well inside the timeout.
       const N = 5_000;
       const ids: string[] = [];
       const items = new Map();
