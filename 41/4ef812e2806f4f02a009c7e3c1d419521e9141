@@ -1,0 +1,46 @@
+tests/bugfix-sweep.test.ts
+  s_4f6060d980524a::t_bdb0eb4f8b8c45 790-791
+vitest.config.ts
+  s_4f6060d980524a::t_26378de00c75d3 6-8
+src/reducer.ts
+  s_4f6060d980524a::t_6c24baeaece4a9 199-245,247-264
+  s_4f6060d980524a::t_72a4a9ff429f74 70-83,85,88,92-99,103,109-116,120,133-135,146,150,154-161,165,171-178,182,187-198,265-287,289-290
+package.json
+  s_4f6060d980524a::t_5170c8107d31dc 22-24
+src/integrity.ts
+  s_4f6060d980524a::t_0554d781fe5248 9-15
+  s_4f6060d980524a::t_a7a5037cd59bee 189,191-194,197,204-205
+  s_4f6060d980524a::t_14442119dabeee 227-231,237,251,258-268,270
+src/replay.ts
+  s_4f6060d980524a::t_a4a21090c3ce40 4-5,9
+  s_4f6060d980524a::t_a636910f55ee39 155-157,162-163,173
+  s_4f6060d980524a::t_be2f5fd112c561 28-33,39-40,50
+src/transplant.ts
+  s_4f6060d980524a::t_c5a706a71c4af6 11
+  s_4f6060d980524a::t_a5ff8b113b8896 655,665,676
+  s_4f6060d980524a::t_dcb100ab9e5d10 386,397,412,426,434,438,451,466,481
+  s_4f6060d980524a::t_4dbe27411c9ef6 358-364
+src/query.ts
+  s_4f6060d980524a::t_b7f01c951ca392 441-443,445-448
+  s_4f6060d980524a::t_1dea4296da84b8 426-440,444,449-455
+tests/in-place-fold.test.ts
+  s_4f6060d980524a::t_5056cf57138e7e 1-124,126-247,249-292,294-336
+bench/memex.bench.ts
+  s_4f6060d980524a::t_a45b4b3d1cb483 1-125,127-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "414ef812e2806f4f02a009c7e3c1d419521e9141",
+  "prompts": {},
+  "sessions": {
+    "s_4f6060d980524a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a10b97fd-61c2-4a50-9ca1-a71057d091f5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "LZL0 <12474488+LZL0@users.noreply.github.com>"
+    }
+  }
+}
