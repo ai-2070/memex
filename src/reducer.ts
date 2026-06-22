@@ -67,59 +67,61 @@ function mergeEdge(existing: Edge, partial: Partial<Edge>): Edge {
   return { ...existing, ...stripUndefined(rest) };
 }
 
-export function applyCommand(
-  state: GraphState,
+/**
+ * Apply a command by mutating the given maps in place, returning the lifecycle
+ * events. Every case validates fully before performing any mutation, so a
+ * thrown command leaves both maps untouched (atomic per command). That
+ * atomicity is what lets callers that share working maps across many commands —
+ * replay, bulk import — skip a failed command and keep going.
+ *
+ * This is the single source of truth for command semantics. The immutable
+ * `applyCommand` is a thin wrapper that clones first; bulk callers reuse one set
+ * of maps to avoid the per-command clone that makes folding O(N^2).
+ */
+export function applyCommandInPlace(
+  items: Map<string, MemoryItem>,
+  edges: Map<string, Edge>,
   cmd: MemoryCommand,
-): { state: GraphState; events: MemoryLifecycleEvent[] } {
+): MemoryLifecycleEvent[] {
   switch (cmd.type) {
     case "memory.create": {
-      if (state.items.has(cmd.item.id)) {
+      if (items.has(cmd.item.id)) {
         throw new DuplicateMemoryError(cmd.item.id);
       }
-      const items = new Map(state.items);
       items.set(cmd.item.id, cmd.item);
-      return {
-        state: { items, edges: state.edges },
-        events: [
-          {
-            namespace: "memory",
-            type: "memory.created",
-            item: cmd.item,
-            cause_type: cmd.type,
-          },
-        ],
-      };
+      return [
+        {
+          namespace: "memory",
+          type: "memory.created",
+          item: cmd.item,
+          cause_type: cmd.type,
+        },
+      ];
     }
 
     case "memory.update": {
-      const existing = state.items.get(cmd.item_id);
+      const existing = items.get(cmd.item_id);
       if (!existing) {
         throw new MemoryNotFoundError(cmd.item_id);
       }
       const merged = mergeItem(existing, cmd.partial);
-      const items = new Map(state.items);
       items.set(cmd.item_id, merged);
-      return {
-        state: { items, edges: state.edges },
-        events: [
-          {
-            namespace: "memory",
-            type: "memory.updated",
-            item: merged,
-            cause_type: cmd.type,
-          },
-        ],
-      };
+      return [
+        {
+          namespace: "memory",
+          type: "memory.updated",
+          item: merged,
+          cause_type: cmd.type,
+        },
+      ];
     }
 
     case "memory.retract": {
-      const existing = state.items.get(cmd.item_id);
+      const existing = items.get(cmd.item_id);
       if (!existing) {
         throw new MemoryNotFoundError(cmd.item_id);
       }
-      const items = new Map(state.items);
       items.delete(cmd.item_id);
-      const edges = new Map(state.edges);
       const events: MemoryLifecycleEvent[] = [
         {
           namespace: "memory",
@@ -128,7 +130,9 @@ export function applyCommand(
           cause_type: cmd.type,
         },
       ];
-      for (const [edgeId, edge] of state.edges) {
+      // Deleting the currently-yielded key during Map iteration is well-defined
+      // and visits every other entry exactly once.
+      for (const [edgeId, edge] of edges) {
         if (edge.from === cmd.item_id || edge.to === cmd.item_id) {
           edges.delete(edgeId);
           events.push({
@@ -139,67 +143,149 @@ export function applyCommand(
           });
         }
       }
-      return { state: { items, edges }, events };
+      return events;
     }
 
     case "edge.create": {
-      if (state.edges.has(cmd.edge.edge_id)) {
+      if (edges.has(cmd.edge.edge_id)) {
         throw new DuplicateEdgeError(cmd.edge.edge_id);
       }
-      const edges = new Map(state.edges);
       edges.set(cmd.edge.edge_id, cmd.edge);
-      return {
-        state: { items: state.items, edges },
-        events: [
-          {
-            namespace: "memory",
-            type: "edge.created",
-            edge: cmd.edge,
-            cause_type: cmd.type,
-          },
-        ],
-      };
+      return [
+        {
+          namespace: "memory",
+          type: "edge.created",
+          edge: cmd.edge,
+          cause_type: cmd.type,
+        },
+      ];
     }
 
     case "edge.update": {
-      const existing = state.edges.get(cmd.edge_id);
+      const existing = edges.get(cmd.edge_id);
       if (!existing) {
         throw new EdgeNotFoundError(cmd.edge_id);
       }
       const merged = mergeEdge(existing, cmd.partial);
-      const edges = new Map(state.edges);
       edges.set(cmd.edge_id, merged);
-      return {
-        state: { items: state.items, edges },
-        events: [
-          {
-            namespace: "memory",
-            type: "edge.updated",
-            edge: merged,
-            cause_type: cmd.type,
-          },
-        ],
-      };
+      return [
+        {
+          namespace: "memory",
+          type: "edge.updated",
+          edge: merged,
+          cause_type: cmd.type,
+        },
+      ];
     }
 
     case "edge.retract": {
-      const existing = state.edges.get(cmd.edge_id);
+      const existing = edges.get(cmd.edge_id);
       if (!existing) {
         throw new EdgeNotFoundError(cmd.edge_id);
       }
-      const edges = new Map(state.edges);
       edges.delete(cmd.edge_id);
-      return {
-        state: { items: state.items, edges },
-        events: [
-          {
-            namespace: "memory",
-            type: "edge.retracted",
-            edge: existing,
-            cause_type: cmd.type,
-          },
-        ],
-      };
+      return [
+        {
+          namespace: "memory",
+          type: "edge.retracted",
+          edge: existing,
+          cause_type: cmd.type,
+        },
+      ];
     }
   }
+}
+
+/**
+ * Retract many items from the given maps in place, in the order supplied,
+ * cascading edge cleanup exactly as a sequence of `memory.retract` commands
+ * would. Returns the lifecycle events and the ids actually retracted (ids not
+ * present are silently skipped).
+ *
+ * A naive loop of per-item retracts rescans every edge per item — O(retracted x
+ * edges). This builds the endpoint -> incident-edges index once (lazily, only
+ * when edges exist) so the cascade is O(items-touched + edges). The index is
+ * built from the live edge set on first use; edges removed by earlier retracts
+ * in the same batch are skipped via the membership check.
+ */
+export function retractItemsInPlace(
+  items: Map<string, MemoryItem>,
+  edges: Map<string, Edge>,
+  itemIds: Iterable<string>,
+  causeType: string,
+): { events: MemoryLifecycleEvent[]; retracted: string[] } {
+  const events: MemoryLifecycleEvent[] = [];
+  const retracted: string[] = [];
+  let edgesByEndpoint: Map<string, string[]> | null = null;
+
+  for (const id of itemIds) {
+    const existing = items.get(id);
+    if (!existing) continue;
+    items.delete(id);
+    events.push({
+      namespace: "memory",
+      type: "memory.retracted",
+      item: existing,
+      cause_type: causeType,
+    });
+    retracted.push(id);
+
+    if (edges.size === 0) continue;
+    if (edgesByEndpoint === null) {
+      edgesByEndpoint = new Map<string, string[]>();
+      for (const [edgeId, edge] of edges) {
+        let list = edgesByEndpoint.get(edge.from);
+        if (!list) edgesByEndpoint.set(edge.from, (list = []));
+        list.push(edgeId);
+        if (edge.from !== edge.to) {
+          list = edgesByEndpoint.get(edge.to);
+          if (!list) edgesByEndpoint.set(edge.to, (list = []));
+          list.push(edgeId);
+        }
+      }
+    }
+    const incidentIds = edgesByEndpoint.get(id);
+    if (!incidentIds) continue;
+    for (const edgeId of incidentIds) {
+      const edge = edges.get(edgeId);
+      if (!edge) continue; // already removed by a prior retract in this batch
+      edges.delete(edgeId);
+      events.push({
+        namespace: "memory",
+        type: "edge.retracted",
+        edge,
+        cause_type: causeType,
+      });
+    }
+  }
+
+  return { events, retracted };
+}
+
+export function applyCommand(
+  state: GraphState,
+  cmd: MemoryCommand,
+): { state: GraphState; events: MemoryLifecycleEvent[] } {
+  // Clone only the map(s) this command can touch, preserving structural sharing
+  // of the untouched map — a memory.* command keeps the same edges Map, and
+  // vice versa. memory.retract is the lone command that mutates both.
+  let items = state.items;
+  let edges = state.edges;
+  switch (cmd.type) {
+    case "memory.create":
+    case "memory.update":
+      items = new Map(items);
+      break;
+    case "memory.retract":
+      items = new Map(items);
+      edges = new Map(edges);
+      break;
+    case "edge.create":
+    case "edge.update":
+    case "edge.retract":
+      edges = new Map(edges);
+      break;
+  }
+  const events = applyCommandInPlace(items, edges, cmd);
+  return { state: { items, edges }, events };
 }
